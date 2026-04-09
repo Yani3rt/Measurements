@@ -1,20 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# The Atelier
 
-# Run and deploy your AI Studio app
+The Atelier is a Vite + React measurement reference app for managing family clothing measurements. It lets you create profiles, switch between front and back body views, select measurement points on a technical diagram, and edit values with an integrated ruler and local profile storage.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/8dc0fa3c-c030-4f40-b61d-05ca72b77f72
+- Create, edit, and delete family profiles
+- Store height, sex, and measurement data per profile
+- Switch between front and back measurement views
+- Edit measurements in `cm` or `in`
+- Save data locally in the browser
 
-## Run Locally
+## Run locally
 
-**Prerequisites:**  Node.js
+```bash
+pnpm install
+pnpm dev
+```
 
+The dev server runs on `http://localhost:3000`.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Available scripts
+
+```bash
+pnpm dev
+pnpm build
+pnpm preview
+pnpm lint
+```
+
+## Notes
+
+- Profile data is stored in browser local storage
+- There is currently no `test` script in `package.json`
