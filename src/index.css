@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,700;1,400&family=Manrope:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Noto Serif", serif;
+  --font-body: "Manrope", sans-serif;
+
+  --color-primary: #03192e;
+  --color-primary-container: #1a2e44;
+  --color-secondary: #735b24;
+  --color-secondary-container: #fddc98;
+  --color-background: #fafaf5;
+  --color-surface: #fafaf5;
+  --color-surface-container-low: #f4f4ef;
+  --color-surface-container-high: #e8e8e3;
+  --color-surface-container-highest: #e3e3de;
+  --color-on-surface: #1a1c19;
+  --color-on-surface-variant: #43474d;
+  --color-outline-variant: #c4c6cd;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    background: var(--color-background);
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top, rgba(253, 220, 152, 0.12), transparent 30%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.45), transparent 42%),
+      var(--color-background);
+    color: var(--color-on-surface);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    selection: var(--color-secondary-container);
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  input::placeholder {
+    color: color-mix(in srgb, var(--color-on-surface-variant) 55%, transparent);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+}
