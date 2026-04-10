@@ -1,4 +1,4 @@
-import {motion} from 'motion/react';
+import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
 import {cmToInches, stripTrailingZeroes} from './utils';
 import type {Unit} from './types';
 
@@ -26,6 +26,7 @@ const scaleConfig = {
     visibleRadius: 3,
   },
 } as const;
+const easeOutQuint = [0.22, 1, 0.36, 1] as const;
 
 export function MeasurementRuler({
   hasRecordedValue,
@@ -35,6 +36,7 @@ export function MeasurementRuler({
   valueCm,
 }: MeasurementRulerProps) {
   const config = scaleConfig[unit];
+  const prefersReducedMotion = useReducedMotion();
   const recordedValue = valueCm === null ? null : unit === 'cm' ? valueCm : cmToInches(valueCm);
   const focusValue =
     selectedLabel && hasRecordedValue && recordedValue !== null ? recordedValue : config.defaultFocus;
@@ -47,6 +49,13 @@ export function MeasurementRuler({
       ? `${stripTrailingZeroes(recordedValue)} ${unit}`
       : 'Pending'
     : 'Select one';
+  const mobileBadgeValue = selectedLabel ? badgeValue : 'Select';
+  const rulerTransition = prefersReducedMotion
+    ? {duration: 0.01}
+    : {type: 'spring', stiffness: 140, damping: 24, mass: 0.8};
+  const badgeTransition = prefersReducedMotion
+    ? {duration: 0.01}
+    : {duration: 0.26, ease: easeOutQuint};
 
   return (
     <div className="pointer-events-none relative w-full overflow-hidden pb-9 pt-2 md:pb-11 md:pt-3">
@@ -57,7 +66,7 @@ export function MeasurementRuler({
         <motion.div
           animate={{x: -focusValue * config.pixelsPerUnit}}
           className="absolute inset-y-0 left-1/2"
-          transition={{type: 'spring', stiffness: 140, damping: 24, mass: 0.8}}
+          transition={rulerTransition}
         >
           <div
             className="relative h-full"
@@ -98,19 +107,38 @@ export function MeasurementRuler({
         </motion.div>
       </div>
 
-      <button
+      <motion.button
         className="pointer-events-auto absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1.5 text-center shadow-[0_16px_30px_-22px_rgba(3,25,46,0.8)] md:bottom-3 md:px-4 md:py-2"
         disabled={!selectedLabel}
-        onClick={onEditSelectedMeasurement}
+        initial={false}
+        onClick={() => onEditSelectedMeasurement?.()}
+        transition={badgeTransition}
         type="button"
       >
-        <p className="type-label text-white/60">
-          {selectedLabel ?? 'Selected measurement'}
-        </p>
-        <p className="type-metric-sm mt-0.5 text-white md:mt-1">
-          {badgeValue}
-        </p>
-      </button>
+        <AnimatePresence initial={false} mode="wait">
+          <motion.div
+            animate={{opacity: 1, y: 0}}
+            exit={{opacity: 0, y: prefersReducedMotion ? 0 : -4}}
+            initial={{opacity: 0, y: prefersReducedMotion ? 0 : 6}}
+            key={`${selectedLabel ?? 'empty'}-${badgeValue}`}
+            transition={badgeTransition}
+          >
+            <p className="type-label hidden text-white/60 md:block">
+              {selectedLabel ?? 'Selected measurement'}
+            </p>
+            <p className="type-metric-sm mt-0 text-white md:mt-1">
+              <span
+                className={`md:hidden ${
+                  selectedLabel ? '' : 'text-[1.2rem] leading-[1] tracking-[-0.01em]'
+                }`}
+              >
+                {mobileBadgeValue}
+              </span>
+              <span className="hidden md:inline">{badgeValue}</span>
+            </p>
+          </motion.div>
+        </AnimatePresence>
+      </motion.button>
     </div>
   );
 }

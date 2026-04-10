@@ -1,4 +1,5 @@
-import {motion} from 'motion/react';
+import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
+import {ArrowRightLeft} from 'lucide-react';
 import frontAsset from '../front.svg';
 import backAsset from '../back.svg';
 import {MeasurementRuler} from './MeasurementRuler';
@@ -25,6 +26,7 @@ const goldSoft = '#d9c189';
 const paper = '#fbfaf6';
 const mist = '#eef0ee';
 const calloutBoxHeight = 36;
+const easeOutQuint = [0.22, 1, 0.36, 1] as const;
 
 function createCalloutBox(x: number, y: number, labelLines: string[]) {
   const longestLineLength = Math.max(...labelLines.map((line) => line.length));
@@ -63,6 +65,8 @@ const calloutsByView: Record<MeasurementView, PlateCallout[]> = {
 export function TechnicalMeasurementPlate({
   currentView,
   onEditSelectedMeasurement,
+  onSetCurrentView,
+  onToggleUnit,
   onSelectMeasurement,
   profile,
   selectedMeasurement,
@@ -72,6 +76,8 @@ export function TechnicalMeasurementPlate({
 }: {
   currentView: MeasurementView;
   onEditSelectedMeasurement: () => void;
+  onSetCurrentView: (view: MeasurementView) => void;
+  onToggleUnit: () => void;
   onSelectMeasurement: (measurementKey: MeasurementKey) => void;
   profile: Profile;
   selectedMeasurement: MeasurementKey | null;
@@ -81,9 +87,50 @@ export function TechnicalMeasurementPlate({
 }) {
   const callouts = calloutsByView[currentView];
   const activeCallout = callouts.find((callout) => callout.key === selectedMeasurement) ?? null;
+  const prefersReducedMotion = useReducedMotion();
+  const stateTransition = prefersReducedMotion
+    ? {duration: 0.01}
+    : {duration: 0.26, ease: easeOutQuint};
+  const drawTransition = prefersReducedMotion
+    ? {duration: 0.01}
+    : {duration: 0.34, ease: easeOutQuint};
+  const settleTransition = prefersReducedMotion
+    ? {duration: 0.01}
+    : {type: 'spring', stiffness: 310, damping: 28, mass: 0.72};
 
   return (
     <div className="relative overflow-hidden rounded-[2.35rem] border border-primary/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(248,246,239,0.95))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] sm:p-4">
+      <div className="absolute left-4 top-4 z-20 sm:left-6 sm:top-5">
+        <div className="inline-flex rounded-full bg-white/92 p-1 shadow-[0_14px_32px_-24px_rgba(3,25,46,0.38)] ring-1 ring-outline-variant/10 backdrop-blur-sm">
+          {([
+            {label: 'Front', value: 'front'},
+            {label: 'Back', value: 'back'},
+          ] as const).map((option) => (
+            <button
+              key={option.value}
+              className={`type-button rounded-full px-4 py-2 transition-all ${
+                option.value === currentView
+                  ? 'bg-primary text-white shadow-[0_10px_18px_-14px_rgba(3,25,46,0.72)]'
+                  : 'text-primary/68'
+              }`}
+              onClick={() => onSetCurrentView(option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-5">
+        <button
+          aria-label={`Switch units to ${unit === 'cm' ? 'in' : 'cm'}`}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-primary shadow-[0_14px_32px_-24px_rgba(3,25,46,0.38)] ring-1 ring-outline-variant/10 backdrop-blur-sm transition-all hover:bg-white"
+          onClick={onToggleUnit}
+          type="button"
+        >
+          <ArrowRightLeft size={14} />
+        </button>
+      </div>
       <div className="absolute inset-x-4 top-3 z-10 sm:inset-x-6 sm:top-4">
         <MeasurementRuler
           hasRecordedValue={selectedMeasurementValueCm !== null && selectedMeasurementValueCm > 0}
@@ -132,86 +179,154 @@ export function TechnicalMeasurementPlate({
 
         {currentView === 'front' ? <FrontFigure /> : <BackFigure />}
 
+        <AnimatePresence initial={false} mode="wait">
+          {activeCallout ? (
+            <motion.path
+              animate={{opacity: 1, pathLength: 1}}
+              d={activeCallout.pathD}
+              exit={{opacity: 0}}
+              fill="none"
+              initial={{opacity: 0, pathLength: 0}}
+              key={`active-line-${activeCallout.key}`}
+              stroke={gold}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="3.5"
+              transition={drawTransition}
+            />
+          ) : null}
+        </AnimatePresence>
+
         {activeCallout ? (
-          <motion.path
-            animate={{opacity: 1, pathLength: 1}}
-            d={activeCallout.pathD}
-            fill="none"
-            initial={{opacity: 0, pathLength: 0}}
-            stroke={gold}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="3.5"
-            transition={{duration: 0.35, ease: 'easeOut'}}
+          <motion.circle
+            animate={
+              prefersReducedMotion
+                ? {opacity: 0.14, r: 10}
+                : {opacity: [0.04, 0.18, 0.04], r: [8, 15, 8]}
+            }
+            cx={activeCallout.anchor.x}
+            cy={activeCallout.anchor.y}
+            fill={goldSoft}
+            initial={{opacity: 0, r: 6}}
+            key={`active-pulse-${activeCallout.key}`}
+            transition={
+              prefersReducedMotion
+                ? {duration: 0.01}
+                : {
+                    duration: 1.65,
+                    ease: easeOutQuint,
+                    repeat: Infinity,
+                    repeatType: 'loop',
+                  }
+            }
           />
         ) : null}
 
         {callouts.map((callout) => {
           const isSelected = selectedMeasurement === callout.key;
           const isMeasured = profile.measurements[callout.key] > 0;
+          const chipLift = isSelected && !prefersReducedMotion ? -2.5 : 0;
 
           return (
-            <g
+            <motion.g
               aria-label={callout.labelLines.join(' ')}
+              initial={false}
               key={callout.key}
               onClick={() => onSelectMeasurement(callout.key)}
               style={{cursor: 'pointer'}}
             >
-              <path
+              <motion.path
+                animate={{
+                  opacity: isSelected ? 1 : isMeasured ? 0.88 : 0.64,
+                  stroke: isSelected ? gold : isMeasured ? measureLineMeasured : measureLineMuted,
+                  strokeWidth: isSelected ? 2.4 : 1.35,
+                }}
                 d={callout.pathD}
                 fill="none"
-                stroke={isSelected ? gold : isMeasured ? measureLineMeasured : measureLineMuted}
                 strokeDasharray={isSelected ? undefined : '2 8'}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={isSelected ? 2.4 : 1.35}
+                transition={stateTransition}
               />
-              <path
+              <motion.path
+                animate={{
+                  opacity: isSelected ? 1 : isMeasured ? 0.86 : 0.72,
+                  stroke: isSelected ? gold : isMeasured ? 'rgba(139,107,40,0.58)' : lineStrong,
+                  strokeWidth: isSelected ? 2.4 : 1.5,
+                }}
                 d={buildLeaderPath(callout)}
                 fill="none"
-                stroke={isSelected ? gold : isMeasured ? 'rgba(139,107,40,0.58)' : lineStrong}
                 strokeDasharray={isSelected ? undefined : '2 6'}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={isSelected ? 2.4 : 1.5}
+                transition={stateTransition}
               />
-              <circle
+              <motion.circle
+                animate={{
+                  fill: isMeasured || isSelected ? gold : ink,
+                  opacity: isSelected ? 1 : isMeasured ? 0.94 : 0.88,
+                  r: isSelected ? 6.2 : 4.6,
+                }}
                 cx={callout.anchor.x}
                 cy={callout.anchor.y}
-                fill={isMeasured || isSelected ? gold : ink}
-                r={isSelected ? 6.2 : 4.6}
                 stroke={paper}
                 strokeWidth="2.5"
+                transition={settleTransition}
               />
 
               <g transform={`translate(${callout.box.x} ${callout.box.y})`}>
-                <rect
-                  fill={isSelected ? ink : isMeasured ? 'rgba(245,233,201,0.95)' : 'rgba(255,255,255,0.84)'}
-                  height={callout.box.height}
-                  rx="18"
-                  stroke={isSelected ? 'rgba(255,255,255,0.16)' : isMeasured ? 'rgba(139,107,40,0.18)' : 'rgba(32,56,74,0.09)'}
-                  width={callout.box.width}
-                />
-                <circle cx="14" cy={callout.box.height / 2} fill={isMeasured || isSelected ? gold : 'rgba(32,56,74,0.24)'} r="4" />
-                <text
-                  fill={isSelected ? paper : isMeasured ? gold : ink}
-                  fontFamily='"Hanken Grotesk", "Avenir Next", "Segoe UI", sans-serif'
-                  fontSize="10.75"
-                  fontWeight="700"
-                  letterSpacing="0.16em"
-                  x="26"
-                  y={callout.labelLines.length === 1 ? callout.box.height / 2 + 4 : 17}
-                >
-                  {callout.labelLines.map((line, index) => (
-                    <tspan dy={index === 0 ? 0 : 13} key={line} x="26">
-                      {line.charAt(0).toUpperCase() + line.slice(1).toLowerCase()}
-                    </tspan>
-                  ))}
-                </text>
+                <motion.g animate={{y: chipLift}} transition={settleTransition}>
+                  <motion.rect
+                    animate={{
+                      fill: isSelected
+                        ? ink
+                        : isMeasured
+                          ? 'rgba(245,233,201,0.95)'
+                          : 'rgba(255,255,255,0.84)',
+                      opacity: isSelected ? 1 : 0.96,
+                      stroke: isSelected
+                        ? 'rgba(255,255,255,0.16)'
+                        : isMeasured
+                          ? 'rgba(139,107,40,0.18)'
+                          : 'rgba(32,56,74,0.09)',
+                    }}
+                    height={callout.box.height}
+                    rx="18"
+                    transition={settleTransition}
+                    width={callout.box.width}
+                  />
+                  <motion.circle
+                    animate={{
+                      fill: isMeasured || isSelected ? gold : 'rgba(32,56,74,0.24)',
+                    }}
+                    cx="14"
+                    cy={callout.box.height / 2}
+                    r="4"
+                    transition={settleTransition}
+                  />
+                  <motion.text
+                    animate={{
+                      fill: isSelected ? paper : isMeasured ? gold : ink,
+                    }}
+                    fontFamily='"Hanken Grotesk", "Avenir Next", "Segoe UI", sans-serif'
+                    fontSize="10.75"
+                    fontWeight="700"
+                    letterSpacing="0.16em"
+                    transition={settleTransition}
+                    x="26"
+                    y={callout.labelLines.length === 1 ? callout.box.height / 2 + 4 : 17}
+                  >
+                    {callout.labelLines.map((line, index) => (
+                      <tspan dy={index === 0 ? 0 : 13} key={line} x="26">
+                        {line.charAt(0).toUpperCase() + line.slice(1).toLowerCase()}
+                      </tspan>
+                    ))}
+                  </motion.text>
+                </motion.g>
               </g>
 
               <path d={callout.pathD} fill="none" pointerEvents="stroke" stroke="transparent" strokeLinecap="round" strokeLinejoin="round" strokeWidth="20" />
-            </g>
+            </motion.g>
           );
         })}
 
