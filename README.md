@@ -20,7 +20,7 @@ pnpm dev
 `pnpm dev` starts both the Vite app and the local Express + SQLite data service.
 
 - App: `http://localhost:3000`
-- API: `http://localhost:3001`
+- API: `http://localhost:3101`
 
 The SQLite file is created automatically at `data/the-atelier.sqlite`.
 

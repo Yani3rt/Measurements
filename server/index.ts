@@ -18,7 +18,7 @@ import {
 
 const app = express();
 const host = '127.0.0.1';
-const port = Number(process.env.PORT ?? 3001);
+const port = Number(process.env.DATA_SERVICE_PORT ?? 3101);
 
 app.use(express.json());
 
