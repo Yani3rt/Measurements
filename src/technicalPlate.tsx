@@ -24,7 +24,7 @@ const gold = '#8b6b28';
 const goldSoft = '#d9c189';
 const paper = '#fbfaf6';
 const mist = '#eef0ee';
-const calloutBoxHeight = 34;
+const calloutBoxHeight = 36;
 
 function createCalloutBox(x: number, y: number, labelLines: string[]) {
   const longestLineLength = Math.max(...labelLines.map((line) => line.length));
@@ -195,10 +195,10 @@ export function TechnicalMeasurementPlate({
                 <circle cx="14" cy={callout.box.height / 2} fill={isMeasured || isSelected ? gold : 'rgba(32,56,74,0.24)'} r="4" />
                 <text
                   fill={isSelected ? paper : isMeasured ? gold : ink}
-                  fontFamily="Manrope, sans-serif"
-                  fontSize="11"
-                  fontWeight="800"
-                  letterSpacing="0.14em"
+                  fontFamily='"Hanken Grotesk", "Avenir Next", "Segoe UI", sans-serif'
+                  fontSize="10.75"
+                  fontWeight="700"
+                  letterSpacing="0.16em"
                   x="26"
                   y={callout.labelLines.length === 1 ? callout.box.height / 2 + 4 : 17}
                 >
@@ -216,10 +216,10 @@ export function TechnicalMeasurementPlate({
         })}
 
         <g opacity="0.4">
-          <text fill={gold} fontFamily="Manrope, sans-serif" fontSize="10.5" fontWeight="700" letterSpacing="0.28em" x="34" y="734">
+          <text fill={gold} fontFamily='"Hanken Grotesk", "Avenir Next", "Segoe UI", sans-serif' fontSize="10.5" fontWeight="700" letterSpacing="0.28em" x="34" y="734">
             HOUSEHOLD ARCHIVE
           </text>
-          <text fill={inkSoft} fontFamily="Manrope, sans-serif" fontSize="10.5" fontWeight="700" letterSpacing="0.28em" textAnchor="end" x="526" y="734">
+          <text fill={inkSoft} fontFamily='"Hanken Grotesk", "Avenir Next", "Segoe UI", sans-serif' fontSize="10.5" fontWeight="700" letterSpacing="0.28em" textAnchor="end" x="526" y="734">
             MEASUREMENT REFERENCE
           </text>
         </g>

@@ -78,7 +78,7 @@ export function MeasurementRuler({
                   }}
                 >
                   {isMajor && isInVisibleRange ? (
-                    <span className="absolute left-1/2 top-0 -translate-x-1/2 font-body text-[1.2rem] font-light text-primary/72 sm:text-[1.45rem] md:text-[2rem]">
+                    <span className="absolute left-1/2 top-0 -translate-x-1/2 font-headline text-[1.3rem] font-semibold tracking-[-0.04em] text-primary/72 [font-variant-numeric:lining-nums_tabular-nums] sm:text-[1.6rem] md:text-[2.2rem]">
                       {Math.round(mark)}
                     </span>
                   ) : null}
@@ -104,10 +104,10 @@ export function MeasurementRuler({
         onClick={onEditSelectedMeasurement}
         type="button"
       >
-        <p className="font-body text-[0.52rem] uppercase tracking-[0.16em] text-white/60 md:text-[0.58rem] md:tracking-[0.18em]">
+        <p className="type-label text-white/60">
           {selectedLabel ?? 'Selected measurement'}
         </p>
-        <p className="mt-0.5 font-headline text-lg text-white md:mt-1 md:text-xl">
+        <p className="type-metric-sm mt-0.5 text-white md:mt-1">
           {badgeValue}
         </p>
       </button>

@@ -262,10 +262,10 @@ export default function App() {
       <header className="sticky top-0 z-30 border-b border-outline-variant/10 bg-background/80 backdrop-blur-[20px]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-8">
           <div>
-            <p className="font-body text-[0.65rem] uppercase tracking-[0.32em] text-secondary">
+            <p className="type-overline text-secondary">
               Household Wardrobe Reference
             </p>
-            <h1 className="font-headline text-2xl text-primary md:text-3xl">The Atelier</h1>
+            <h1 className="type-title text-primary">The Atelier</h1>
           </div>
           <div className="flex items-center gap-3">
             <ProfileSwitcher
@@ -279,7 +279,7 @@ export default function App() {
               selectedProfileId={selectedProfileId}
             />
             <button
-              className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] px-4 py-2.5 font-body text-xs font-bold uppercase tracking-[0.2em] text-white shadow-[0_16px_30px_-18px_rgba(3,25,46,0.75)] transition-transform active:scale-[0.98]"
+              className="type-button inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] px-4 py-2.5 text-white shadow-[0_16px_30px_-18px_rgba(3,25,46,0.75)] transition-transform active:scale-[0.98]"
               onClick={handleStartCreatingProfile}
               type="button"
             >
@@ -311,8 +311,8 @@ export default function App() {
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/8 text-primary">
                   <Ruler size={28} />
                 </div>
-                <h2 className="font-headline text-3xl text-primary">Choose a profile</h2>
-                <p className="mt-3 font-body text-base leading-7 text-on-surface-variant">
+                <h2 className="type-section-title text-primary">Choose a profile</h2>
+                <p className="type-body mt-3 text-on-surface-variant">
                   Select a family member to view front and back measurements, switch units, and update values one by one.
                 </p>
               </div>
@@ -320,7 +320,7 @@ export default function App() {
           )}
 
           {!storageAvailable && (
-            <div className="mt-6 rounded-[1.5rem] bg-secondary-container/28 px-4 py-3 font-body text-sm text-secondary">
+            <div className="type-note mt-6 rounded-[1.5rem] bg-secondary-container/28 px-4 py-3 text-secondary">
               Local storage is unavailable, so your changes will only last for this session.
             </div>
           )}
@@ -411,7 +411,7 @@ function ProfileSwitcher({
   return (
     <div className="relative" ref={menuRef}>
       <button
-        className="inline-flex min-w-[11rem] items-center justify-between gap-3 rounded-full bg-surface px-4 py-2.5 font-body text-xs font-bold uppercase tracking-[0.18em] text-primary ring-1 ring-outline-variant/12 shadow-[0_10px_25px_-22px_rgba(3,25,46,0.7)] transition-transform active:scale-[0.98]"
+        className="type-button inline-flex min-w-[11rem] items-center justify-between gap-3 rounded-full bg-surface px-4 py-2.5 text-primary ring-1 ring-outline-variant/12 shadow-[0_10px_25px_-22px_rgba(3,25,46,0.7)] transition-transform active:scale-[0.98]"
         onClick={onToggle}
         type="button"
       >
@@ -428,7 +428,7 @@ function ProfileSwitcher({
       {isOpen && profiles.length > 0 ? (
         <div className="absolute right-0 z-40 mt-3 w-[20rem] overflow-hidden rounded-[1.5rem] bg-background/98 p-2 shadow-[0_24px_60px_-32px_rgba(3,25,46,0.34)] ring-1 ring-outline-variant/12 backdrop-blur-md">
           <div className="px-3 pb-2 pt-1">
-            <p className="font-body text-[0.62rem] uppercase tracking-[0.24em] text-on-surface-variant">
+            <p className="type-overline text-on-surface-variant">
               Family profiles
             </p>
           </div>
@@ -449,9 +449,9 @@ function ProfileSwitcher({
                     type="button"
                   >
                     <div className="min-w-0">
-                      <p className="font-headline text-xl">{profile.name}</p>
+                      <p className="type-section-title text-[1.55rem] leading-[0.95]">{profile.name}</p>
                       <p
-                        className={`mt-1 font-body text-[0.68rem] uppercase tracking-[0.18em] ${
+                        className={`type-label mt-1 ${
                           isActive ? 'text-white/65' : 'text-on-surface-variant'
                         }`}
                       >
@@ -462,7 +462,7 @@ function ProfileSwitcher({
                   </button>
                   <div className="flex shrink-0 items-center gap-2">
                     <button
-                      className={`rounded-full px-2.5 py-1 font-body text-[0.6rem] font-semibold uppercase tracking-[0.16em] ${
+                      className={`type-button rounded-full px-2.5 py-1 ${
                         isActive ? 'bg-white/12 text-white' : 'bg-secondary-container/50 text-secondary'
                       }`}
                       onClick={() => onEditProfile(profile.id)}
@@ -531,7 +531,7 @@ function ProfileWorkspace({
             value={currentView}
           />
           <button
-            className="inline-flex items-center gap-2 rounded-full bg-surface-container-low px-4 py-2 font-body text-xs font-semibold uppercase tracking-[0.18em] text-primary"
+            className="type-button inline-flex items-center gap-2 rounded-full bg-surface-container-low px-4 py-2 text-primary"
             onClick={onToggleUnit}
             type="button"
           >
@@ -565,20 +565,20 @@ function ProfileWorkspace({
             }`}
           >
             {currentMeasurement ? (
-              <p className="font-body text-sm leading-6 text-white/78">
-                Tip: {currentMeasurement.guide}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="font-body text-[0.65rem] uppercase tracking-[0.24em] text-on-surface-variant">
-                    Ready to inspect
-                  </p>
-                  <p className="mt-2 font-body text-sm leading-6 text-on-surface-variant">
-                    Tap a callout on the plate to bring a measurement into focus. Saved measurements gain a gold accent on the diagram.
-                  </p>
-                </div>
-                <div className="rounded-full bg-secondary-container/45 px-4 py-2 font-body text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-secondary">
+                <p className="type-note text-white/78">
+                  Tip: {currentMeasurement.guide}
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="type-overline text-on-surface-variant">
+                      Ready to inspect
+                    </p>
+                    <p className="type-note mt-2 text-on-surface-variant">
+                      Tap a callout on the plate to bring a measurement into focus. Saved measurements gain a gold accent on the diagram.
+                    </p>
+                  </div>
+                <div className="type-button rounded-full bg-secondary-container/45 px-4 py-2 text-secondary">
                   {getCompletionSummary(profile)}
                 </div>
               </div>
@@ -586,7 +586,7 @@ function ProfileWorkspace({
           </div>
 
           <button
-            className={`inline-flex min-h-[3.6rem] items-center justify-center gap-2 rounded-full px-5 py-3 font-body text-xs font-bold uppercase tracking-[0.22em] transition-all ${
+            className={`type-button inline-flex min-h-[3.6rem] items-center justify-center gap-2 rounded-full px-5 py-3 transition-all ${
               currentMeasurement
                 ? 'bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] text-white shadow-[0_18px_32px_-22px_rgba(3,25,46,0.8)]'
                 : 'cursor-not-allowed bg-surface-container-high text-primary/35'
@@ -604,14 +604,14 @@ function ProfileWorkspace({
       <div className="rounded-[2.2rem] bg-surface-container-low/78 p-4 ring-1 ring-outline-variant/10 md:p-5">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="font-body text-[0.65rem] uppercase tracking-[0.24em] text-on-surface-variant">
+            <p className="type-overline text-on-surface-variant">
               Measurement ledger
             </p>
-            <h3 className="font-headline text-2xl text-primary">
+            <h3 className="type-section-title text-primary">
               {currentView === 'front' ? 'Front measurements' : 'Back measurements'}
             </h3>
           </div>
-          <div className="rounded-full bg-white/70 px-3 py-1 font-body text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-secondary">
+          <div className="type-button rounded-full bg-white/70 px-3 py-1 text-secondary">
             Displaying {unit}
           </div>
         </div>
@@ -668,19 +668,19 @@ function MeasurementLedger({
                     }`}
                   />
                   <p
-                    className={`font-body text-[0.64rem] uppercase tracking-[0.18em] ${
+                    className={`type-label ${
                       isActive ? 'text-white/65' : 'text-on-surface-variant'
                     }`}
                   >
                     {definition.view}
                   </p>
                 </div>
-                <p className="mt-3 font-body text-sm font-semibold leading-5">{definition.label}</p>
+                <p className="type-ui mt-3">{definition.label}</p>
               </div>
               <div className="text-right">
-                <p className="font-headline text-3xl">{formatMeasurement(value, unit)}</p>
+                <p className="type-metric-sm">{formatMeasurement(value, unit)}</p>
                 <p
-                  className={`mt-1 font-body text-[0.62rem] uppercase tracking-[0.18em] ${
+                  className={`type-label mt-1 ${
                     isActive ? 'text-white/65' : isMeasured ? 'text-secondary' : 'text-on-surface-variant'
                   }`}
                 >
@@ -726,11 +726,11 @@ function MeasurementEditModal({
         >
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="font-body text-[0.65rem] uppercase tracking-[0.28em] text-secondary">
+              <p className="type-overline text-secondary">
                 Measurement edit
               </p>
-              <h2 className="font-headline text-3xl text-primary">{currentMeasurement.label}</h2>
-              <p className="mt-2 max-w-lg font-body text-sm leading-6 text-on-surface-variant">
+              <h2 className="type-section-title text-primary">{currentMeasurement.label}</h2>
+              <p className="type-note mt-2 max-w-lg text-on-surface-variant">
                 Enter the updated value in {unit}. The diagram will keep the canonical record in centimeters behind the scenes.
               </p>
             </div>
@@ -744,23 +744,23 @@ function MeasurementEditModal({
           </div>
 
           <div className="mt-8 rounded-[1.8rem] bg-surface-container-low/78 p-5">
-            <p className="font-body text-[0.65rem] uppercase tracking-[0.24em] text-on-surface-variant">
+            <p className="type-overline text-on-surface-variant">
               Measurement guidance
             </p>
-            <p className="mt-3 font-body text-sm leading-6 text-primary/82">
+            <p className="type-note mt-3 text-primary/82">
               {currentMeasurement.guide}
             </p>
           </div>
 
           <div className="mt-6">
             <label
-              className="block font-body text-[0.65rem] uppercase tracking-[0.24em] text-on-surface-variant"
+              className="type-overline block text-on-surface-variant"
               htmlFor="measurement-value"
             >
               Value in {unit}
             </label>
             <input
-              className="mt-3 w-full rounded-[1.25rem] bg-surface-container-low px-4 py-4 font-body text-2xl text-primary outline-none ring-1 ring-transparent transition focus:ring-primary/25"
+              className="type-metric-sm mt-3 w-full rounded-[1.25rem] bg-surface-container-low px-4 py-4 text-primary outline-none ring-1 ring-transparent transition focus:ring-primary/25"
               id="measurement-value"
               inputMode="decimal"
               onChange={(event) => onChangeEditValue(event.target.value)}
@@ -771,14 +771,14 @@ function MeasurementEditModal({
 
           <div className="mt-8 flex flex-col gap-3 md:flex-row md:justify-end">
             <button
-              className="inline-flex items-center justify-center rounded-full bg-surface-container-high px-5 py-3 font-body text-xs font-bold uppercase tracking-[0.2em] text-primary"
+              className="type-button inline-flex items-center justify-center rounded-full bg-surface-container-high px-5 py-3 text-primary"
               onClick={onClose}
               type="button"
             >
               Cancel
             </button>
             <button
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] px-5 py-3 font-body text-xs font-bold uppercase tracking-[0.2em] text-white"
+              className="type-button inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] px-5 py-3 text-white"
               onClick={onSaveMeasurement}
               type="button"
             >
@@ -823,13 +823,13 @@ function ProfileDetailsModal({
         >
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="font-body text-[0.65rem] uppercase tracking-[0.28em] text-secondary">
+              <p className="type-overline text-secondary">
                 {isEditMode ? 'Edit profile' : 'Quick add'}
               </p>
-              <h2 className="font-headline text-3xl text-primary">
+              <h2 className="type-section-title text-primary">
                 {isEditMode ? 'Update profile details' : 'Create a family profile'}
               </h2>
-              <p className="mt-2 max-w-lg font-body text-sm leading-6 text-on-surface-variant">
+              <p className="type-note mt-2 max-w-lg text-on-surface-variant">
                 {isEditMode
                   ? 'Adjust the profile name, sex, or height. Existing measurements stay attached to this profile.'
                   : 'Keep setup light now. Add the essentials, then fill measurements one by one inside the profile workspace.'}
@@ -846,11 +846,11 @@ function ProfileDetailsModal({
 
           <div className="mt-8 grid gap-5 md:grid-cols-2">
             <label className="block">
-              <span className="font-body text-[0.65rem] uppercase tracking-[0.24em] text-on-surface-variant">
+              <span className="type-overline text-on-surface-variant">
                 Name
               </span>
               <input
-                className="mt-2 w-full rounded-[1.2rem] bg-surface-container-low px-4 py-3 font-body text-base text-primary outline-none ring-1 ring-transparent transition focus:ring-primary/25"
+                className="type-input mt-2 w-full rounded-[1.2rem] bg-surface-container-low px-4 py-3 text-primary outline-none ring-1 ring-transparent transition focus:ring-primary/25"
                 onChange={(event) =>
                   onChangeDraftProfile({...draftProfile, name: event.target.value})
                 }
@@ -860,11 +860,11 @@ function ProfileDetailsModal({
             </label>
 
             <label className="block">
-              <span className="font-body text-[0.65rem] uppercase tracking-[0.24em] text-on-surface-variant">
+              <span className="type-overline text-on-surface-variant">
                 Height (cm)
               </span>
               <input
-                className="mt-2 w-full rounded-[1.2rem] bg-surface-container-low px-4 py-3 font-body text-base text-primary outline-none ring-1 ring-transparent transition focus:ring-primary/25"
+                className="type-input mt-2 w-full rounded-[1.2rem] bg-surface-container-low px-4 py-3 text-primary outline-none ring-1 ring-transparent transition focus:ring-primary/25"
                 inputMode="decimal"
                 onChange={(event) =>
                   onChangeDraftProfile({...draftProfile, heightCm: event.target.value})
@@ -876,14 +876,14 @@ function ProfileDetailsModal({
           </div>
 
           <div className="mt-5">
-            <span className="font-body text-[0.65rem] uppercase tracking-[0.24em] text-on-surface-variant">
+            <span className="type-overline text-on-surface-variant">
               Sex
             </span>
             <div className="mt-2 flex gap-3">
               {(['female', 'male'] as Sex[]).map((value) => (
                 <button
                   key={value}
-                  className={`rounded-full px-4 py-3 font-body text-xs font-bold uppercase tracking-[0.18em] transition-all ${
+                  className={`type-button rounded-full px-4 py-3 transition-all ${
                     draftProfile.sex === value
                       ? 'bg-primary text-white'
                       : 'bg-surface-container-low text-primary'
@@ -899,14 +899,14 @@ function ProfileDetailsModal({
 
           <div className="mt-8 flex flex-col gap-3 md:flex-row md:justify-end">
             <button
-              className="inline-flex items-center justify-center rounded-full bg-surface-container-low px-5 py-3 font-body text-xs font-bold uppercase tracking-[0.2em] text-primary"
+              className="type-button inline-flex items-center justify-center rounded-full bg-surface-container-low px-5 py-3 text-primary"
               onClick={onClose}
               type="button"
             >
               Cancel
             </button>
             <button
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] px-5 py-3 font-body text-xs font-bold uppercase tracking-[0.2em] text-white"
+              className="type-button inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] px-5 py-3 text-white"
               onClick={onSaveProfile}
               type="button"
             >
@@ -934,7 +934,7 @@ function SegmentedControl({
       {options.map((option) => (
         <button
           key={option.value}
-          className={`rounded-full px-4 py-2 font-body text-xs font-bold uppercase tracking-[0.18em] transition-all ${
+          className={`type-button rounded-full px-4 py-2 transition-all ${
             option.value === value ? 'bg-primary text-white' : 'text-primary/70'
           }`}
           onClick={() => onChange(option.value)}
