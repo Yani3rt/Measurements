@@ -2,7 +2,9 @@ node_modules/
 build/
 dist/
 coverage/
+output/
 .DS_Store
+.playwright-cli/
 *.log
 .env*
 !.env.example
