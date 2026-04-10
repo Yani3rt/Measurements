@@ -56,11 +56,24 @@ export function MeasurementRuler({
   const badgeTransition = prefersReducedMotion
     ? {duration: 0.01}
     : {duration: 0.26, ease: easeOutQuint};
+  const hasSelection = Boolean(selectedLabel);
 
   return (
     <div className="pointer-events-none relative w-full overflow-hidden pb-9 pt-2 md:pb-11 md:pt-3">
-      <div className="pointer-events-none absolute left-1/2 top-[17px] h-3 w-3 -translate-x-1/2 rotate-45 rounded-[0.24rem] bg-secondary shadow-[0_10px_20px_-12px_rgba(115,91,36,0.82)] md:top-[19px] md:h-3.5 md:w-3.5 md:rounded-[0.28rem]" />
-      <div className="pointer-events-none absolute bottom-0 left-1/2 top-[42px] w-px -translate-x-1/2 bg-[linear-gradient(180deg,rgba(115,91,36,0.65),rgba(115,91,36,0.08))] md:top-[46px]" />
+      <div
+        className={`pointer-events-none absolute left-1/2 top-[17px] h-3 w-3 -translate-x-1/2 rotate-45 rounded-[0.24rem] md:top-[19px] md:h-3.5 md:w-3.5 md:rounded-[0.28rem] ${
+          hasSelection
+            ? 'bg-guidance shadow-[0_10px_20px_-12px_rgba(46,111,115,0.78)]'
+            : 'bg-secondary shadow-[0_10px_20px_-12px_rgba(115,91,36,0.82)]'
+        }`}
+      />
+      <div
+        className={`pointer-events-none absolute bottom-0 left-1/2 top-[42px] w-px -translate-x-1/2 md:top-[46px] ${
+          hasSelection
+            ? 'bg-[linear-gradient(180deg,rgba(46,111,115,0.68),rgba(46,111,115,0.08))]'
+            : 'bg-[linear-gradient(180deg,rgba(115,91,36,0.65),rgba(115,91,36,0.08))]'
+        }`}
+      />
 
       <div className="relative h-[4.5rem] overflow-hidden sm:h-[5rem] md:h-24">
         <motion.div
@@ -108,7 +121,11 @@ export function MeasurementRuler({
       </div>
 
       <motion.button
-        className="pointer-events-auto absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1.5 text-center shadow-[0_16px_30px_-22px_rgba(3,25,46,0.8)] md:bottom-3 md:px-4 md:py-2"
+        className={`pointer-events-auto absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full px-3 py-1.5 text-center md:bottom-3 md:px-4 md:py-2 ${
+          hasSelection
+            ? 'bg-primary ring-1 ring-guidance/45 shadow-[0_18px_32px_-20px_rgba(36,88,92,0.45)]'
+            : 'bg-primary shadow-[0_16px_30px_-22px_rgba(3,25,46,0.8)]'
+        }`}
         disabled={!selectedLabel}
         initial={false}
         onClick={() => onEditSelectedMeasurement?.()}

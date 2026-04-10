@@ -17,12 +17,15 @@ type PlateCallout = {
 
 const ink = '#20384a';
 const inkSoft = '#6b7c8d';
-const measureLineMuted = 'rgba(141, 112, 66, 0.54)';
-const measureLineMeasured = 'rgba(139, 107, 40, 0.68)';
-const lineMuted = 'rgba(44, 62, 78, 0.44)';
-const lineStrong = 'rgba(44, 62, 78, 0.7)';
+const measureLineIdle = 'rgba(152, 122, 67, 0.72)';
+const measureLineMeasured = 'rgba(139, 107, 40, 0.84)';
+const measureLineSelected = '#2e6f73';
+const leaderLineIdle = 'rgba(58, 76, 92, 0.48)';
+const leaderLineMeasured = 'rgba(58, 76, 92, 0.6)';
+const leaderLineSelected = 'rgba(46, 111, 115, 0.82)';
 const gold = '#8b6b28';
-const goldSoft = '#d9c189';
+const guidance = '#2e6f73';
+const guidanceSoft = '#d7e8e6';
 const paper = '#fbfaf6';
 const mist = '#eef0ee';
 const calloutBoxHeight = 36;
@@ -192,6 +195,9 @@ export function TechnicalMeasurementPlate({
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth="3.5"
+              style={{
+                filter: 'drop-shadow(0 0 8px rgba(46,111,115,0.16))',
+              }}
               transition={drawTransition}
             />
           ) : null}
@@ -202,11 +208,11 @@ export function TechnicalMeasurementPlate({
             animate={
               prefersReducedMotion
                 ? {opacity: 0.14, r: 10}
-                : {opacity: [0.04, 0.18, 0.04], r: [8, 15, 8]}
+                : {opacity: [0.05, 0.22, 0.05], r: [8, 15, 8]}
             }
             cx={activeCallout.anchor.x}
             cy={activeCallout.anchor.y}
-            fill={goldSoft}
+            fill={guidanceSoft}
             initial={{opacity: 0, r: 6}}
             key={`active-pulse-${activeCallout.key}`}
             transition={
@@ -237,33 +243,45 @@ export function TechnicalMeasurementPlate({
             >
               <motion.path
                 animate={{
-                  opacity: isSelected ? 1 : isMeasured ? 0.88 : 0.64,
-                  stroke: isSelected ? gold : isMeasured ? measureLineMeasured : measureLineMuted,
-                  strokeWidth: isSelected ? 2.4 : 1.35,
+                  opacity: isSelected ? 1 : isMeasured ? 0.96 : 0.88,
+                  stroke: isSelected
+                    ? measureLineSelected
+                    : isMeasured
+                      ? measureLineMeasured
+                      : measureLineIdle,
+                  strokeWidth: isSelected ? 3.1 : isMeasured ? 2.3 : 2.05,
                 }}
                 d={callout.pathD}
                 fill="none"
-                strokeDasharray={isSelected ? undefined : '2 8'}
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                style={{
+                  filter: isSelected
+                    ? 'drop-shadow(0 0 6px rgba(46,111,115,0.12))'
+                    : undefined,
+                }}
                 transition={stateTransition}
               />
               <motion.path
                 animate={{
-                  opacity: isSelected ? 1 : isMeasured ? 0.86 : 0.72,
-                  stroke: isSelected ? gold : isMeasured ? 'rgba(139,107,40,0.58)' : lineStrong,
-                  strokeWidth: isSelected ? 2.4 : 1.5,
+                  opacity: isSelected ? 0.94 : isMeasured ? 0.8 : 0.72,
+                  stroke: isSelected
+                    ? leaderLineSelected
+                    : isMeasured
+                      ? leaderLineMeasured
+                      : leaderLineIdle,
+                  strokeWidth: isSelected ? 2 : 1.55,
                 }}
                 d={buildLeaderPath(callout)}
                 fill="none"
-                strokeDasharray={isSelected ? undefined : '2 6'}
+                strokeDasharray={isSelected ? '2 7' : '2 6'}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 transition={stateTransition}
               />
               <motion.circle
                 animate={{
-                  fill: isMeasured || isSelected ? gold : ink,
+                  fill: isSelected ? guidance : isMeasured ? gold : ink,
                   opacity: isSelected ? 1 : isMeasured ? 0.94 : 0.88,
                   r: isSelected ? 6.2 : 4.6,
                 }}
@@ -285,19 +303,24 @@ export function TechnicalMeasurementPlate({
                           : 'rgba(255,255,255,0.84)',
                       opacity: isSelected ? 1 : 0.96,
                       stroke: isSelected
-                        ? 'rgba(255,255,255,0.16)'
+                        ? 'rgba(215,232,230,0.82)'
                         : isMeasured
                           ? 'rgba(139,107,40,0.18)'
                           : 'rgba(32,56,74,0.09)',
                     }}
                     height={callout.box.height}
                     rx="18"
+                    style={{
+                      filter: isSelected
+                        ? 'drop-shadow(0 10px 24px rgba(46,111,115,0.18))'
+                        : undefined,
+                    }}
                     transition={settleTransition}
                     width={callout.box.width}
                   />
                   <motion.circle
                     animate={{
-                      fill: isMeasured || isSelected ? gold : 'rgba(32,56,74,0.24)',
+                      fill: isSelected ? guidance : isMeasured ? gold : 'rgba(32,56,74,0.24)',
                     }}
                     cx="14"
                     cy={callout.box.height / 2}

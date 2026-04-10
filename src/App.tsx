@@ -736,7 +736,7 @@ function ProfileWorkspace({
           <div
             className={`rounded-[1.9rem] p-5 transition-all ${
               currentMeasurement
-                ? 'bg-primary text-white shadow-[0_18px_40px_-24px_rgba(3,25,46,0.75)]'
+                ? 'bg-primary text-white ring-1 ring-guidance/28 shadow-[0_18px_40px_-24px_rgba(36,88,92,0.34)]'
                 : 'bg-white/74 text-primary ring-1 ring-outline-variant/12'
             }`}
           >
@@ -790,7 +790,7 @@ function ProfileWorkspace({
         <button
           className={`type-button mt-4 inline-flex min-h-[3.6rem] w-full items-center justify-center gap-2 rounded-full px-5 py-3 transition-all ${
             currentMeasurement
-              ? 'bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] text-white shadow-[0_18px_32px_-22px_rgba(3,25,46,0.8)]'
+              ? 'bg-[linear-gradient(135deg,_var(--color-guidance-strong),_var(--color-guidance))] text-white shadow-[0_18px_32px_-22px_rgba(36,88,92,0.48)]'
               : 'cursor-not-allowed bg-surface-container-high text-primary/35'
           }`}
           disabled={!currentMeasurement}
@@ -845,7 +845,7 @@ function MeasurementLedger({
                 ? {
                     scale: 1,
                     y: -2,
-                    boxShadow: '0 22px 40px -26px rgba(3,25,46,0.68)',
+                    boxShadow: '0 22px 40px -26px rgba(36,88,92,0.42)',
                   }
                 : {
                     scale: 1,
@@ -855,7 +855,7 @@ function MeasurementLedger({
             }
             className={`scroll-mt-5 rounded-[1.45rem] px-4 py-4 text-left transition-all ${
               isActive
-                ? 'bg-primary text-white shadow-[0_18px_36px_-24px_rgba(3,25,46,0.72)] ring-1 ring-secondary/28'
+                ? 'bg-primary text-white shadow-[0_18px_36px_-24px_rgba(36,88,92,0.42)] ring-1 ring-guidance/40'
                 : 'bg-white/72 text-primary ring-1 ring-outline-variant/10 hover:bg-white'
             }`}
             initial={false}
@@ -872,7 +872,11 @@ function MeasurementLedger({
                 <div className="flex items-center gap-2">
                   <span
                     className={`h-2.5 w-2.5 rounded-full ${
-                      isMeasured ? 'bg-secondary' : isActive ? 'bg-white' : 'bg-primary/25'
+                      isActive
+                        ? 'bg-guidance-soft'
+                        : isMeasured
+                          ? 'bg-secondary'
+                          : 'bg-primary/25'
                     }`}
                   />
                   <p
@@ -976,7 +980,7 @@ function MeasurementEditModal({
               Value in {unit}
             </label>
             <input
-              className="type-metric-sm mt-3 w-full rounded-[1.25rem] bg-surface-container-low px-4 py-4 text-primary outline-none ring-1 ring-transparent transition focus:ring-primary/25"
+              className="type-metric-sm mt-3 w-full rounded-[1.25rem] bg-surface-container-low px-4 py-4 text-primary outline-none ring-1 ring-transparent transition focus:ring-guidance/35"
               id="measurement-value"
               inputMode="decimal"
               max={getMeasurementMax(unit)}
@@ -1003,7 +1007,7 @@ function MeasurementEditModal({
               Cancel
             </button>
             <button
-              className="type-button inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] px-5 py-3 text-white disabled:cursor-not-allowed disabled:opacity-45"
+              className="type-button inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,_var(--color-guidance-strong),_var(--color-guidance))] px-5 py-3 text-white disabled:cursor-not-allowed disabled:opacity-45"
               disabled={!canSaveMeasurement}
               onClick={onSaveMeasurement}
               type="button"
@@ -1086,7 +1090,7 @@ function ProfileDetailsModal({
                 Name
               </span>
               <input
-                className="type-input mt-2 w-full rounded-[1.2rem] bg-surface-container-low px-4 py-3 text-primary outline-none ring-1 ring-transparent transition focus:ring-primary/25"
+                className="type-input mt-2 w-full rounded-[1.2rem] bg-surface-container-low px-4 py-3 text-primary outline-none ring-1 ring-transparent transition focus:ring-guidance/35"
                 maxLength={MAX_PROFILE_NAME_LENGTH}
                 onChange={(event) =>
                   onChangeDraftProfile({...draftProfile, name: event.target.value})
@@ -1104,7 +1108,7 @@ function ProfileDetailsModal({
                 Height (cm)
               </span>
               <input
-                className="type-input mt-2 w-full rounded-[1.2rem] bg-surface-container-low px-4 py-3 text-primary outline-none ring-1 ring-transparent transition focus:ring-primary/25"
+                className="type-input mt-2 w-full rounded-[1.2rem] bg-surface-container-low px-4 py-3 text-primary outline-none ring-1 ring-transparent transition focus:ring-guidance/35"
                 inputMode="decimal"
                 max={MAX_HEIGHT_CM}
                 min={MIN_HEIGHT_CM}
