@@ -187,22 +187,28 @@ begin
 
     return new;
   elsif tg_op = 'DELETE' then
-    insert into public.measurement_history (
-      profile_id,
-      measurement_key,
-      event_type,
-      previous_value_cm,
-      value_cm,
-      changed_at
-    )
-    values (
-      old.profile_id,
-      old.measurement_key,
-      'delete',
-      old.value_cm,
-      null,
-      now()
-    );
+    if exists (
+      select 1
+      from public.profiles
+      where id = old.profile_id
+    ) then
+      insert into public.measurement_history (
+        profile_id,
+        measurement_key,
+        event_type,
+        previous_value_cm,
+        value_cm,
+        changed_at
+      )
+      values (
+        old.profile_id,
+        old.measurement_key,
+        'delete',
+        old.value_cm,
+        null,
+        now()
+      );
+    end if;
 
     return old;
   end if;
@@ -216,14 +222,6 @@ returns trigger
 language plpgsql
 as $function$
 begin
-  if tg_op = 'DELETE' then
-    update public.profiles
-    set updated_at = now()
-    where id = old.profile_id;
-
-    return old;
-  end if;
-
   update public.profiles
   set updated_at = now()
   where id = new.profile_id;
@@ -258,6 +256,6 @@ execute function public.capture_measurement_history();
 
 drop trigger if exists measurements_touch_profile_updated_at on public.measurements;
 create trigger measurements_touch_profile_updated_at
-after insert or update or delete on public.measurements
+after insert or update on public.measurements
 for each row
 execute function public.touch_profile_updated_at_from_measurements();
