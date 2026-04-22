@@ -16,14 +16,14 @@ const scaleConfig = {
     domainMax: 260,
     minorStep: 0.25,
     pixelsPerUnit: 46,
-    visibleRadius: 3,
+    visibleRadius: 5,
   },
   in: {
     defaultFocus: 8.5,
     domainMax: 104,
     minorStep: 0.125,
     pixelsPerUnit: 60,
-    visibleRadius: 3,
+    visibleRadius: 5,
   },
 } as const;
 const easeOutQuint = [0.22, 1, 0.36, 1] as const;
@@ -92,20 +92,14 @@ export function MeasurementRuler({
 
               return (
                 <div
-                  className="absolute bottom-0"
+                  className="absolute top-2 flex -translate-x-1/2 flex-col items-center sm:top-2.5 md:top-3"
                   key={mark}
                   style={{
                     left: `${mark * config.pixelsPerUnit}px`,
-                    transform: 'translateX(-50%)',
                   }}
                 >
-                  {isMajor && isInVisibleRange ? (
-                    <span className="absolute left-1/2 top-0 -translate-x-1/2 font-headline text-[1.3rem] font-semibold tracking-[-0.04em] text-primary/72 [font-variant-numeric:lining-nums_tabular-nums] sm:text-[1.6rem] md:text-[2.2rem]">
-                      {Math.round(mark)}
-                    </span>
-                  ) : null}
                   <span
-                    className={`absolute bottom-0 left-1/2 w-px -translate-x-1/2 rounded-full ${
+                    className={`w-px rounded-full ${
                       isMajor
                         ? 'h-8 bg-primary/40 sm:h-9 md:h-11'
                         : isMedium
@@ -113,6 +107,11 @@ export function MeasurementRuler({
                           : 'h-4 bg-primary/18 sm:h-4.5 md:h-5'
                     }`}
                   />
+                  {isMajor && isInVisibleRange ? (
+                    <span className="mt-1.5 font-headline text-[0.7rem] font-semibold tracking-[0.08em] text-primary/58 [font-variant-numeric:lining-nums_tabular-nums] sm:text-[0.76rem] md:mt-2 md:text-[0.9rem]">
+                      {Math.round(mark)}
+                    </span>
+                  ) : null}
                 </div>
               );
             })}

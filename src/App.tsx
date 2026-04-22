@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {AnimatePresence, motion} from 'motion/react';
+import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
 import {
   Check,
   ChevronDown,
@@ -43,6 +43,31 @@ type DraftProfile = {
   name: string;
   sex: Sex;
   heightCm: string;
+};
+
+const elegantEase = [0.22, 1, 0.36, 1] as const;
+const decisiveEase = [0.16, 1, 0.3, 1] as const;
+const calmEase = [0.25, 1, 0.5, 1] as const;
+
+const fadeUpVariants = {
+  hidden: {opacity: 0, y: 14},
+  visible: (index = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.34,
+      ease: elegantEase,
+      delay: index * 0.04,
+    },
+  }),
+  exit: {
+    opacity: 0,
+    y: 10,
+    transition: {
+      duration: 0.2,
+      ease: decisiveEase,
+    },
+  },
 };
 
 const defaultDraftProfile: DraftProfile = {
@@ -94,6 +119,7 @@ export default function App() {
   const [isSavingMeasurement, setIsSavingMeasurement] = useState(false);
   const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
   const hasLoadedProfilesRef = useRef(false);
+  const prefersReducedMotion = useReducedMotion();
 
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) ?? null;
   const currentMeasurement =
@@ -463,18 +489,36 @@ export default function App() {
               </div>
             </div>
           ) : selectedProfile ? (
-            <ProfileWorkspace
-              currentMeasurement={currentMeasurement}
-              currentView={currentView}
-              onSelectMeasurement={handleSelectMeasurement}
-              onSetCurrentView={setCurrentView}
-              onStartEditing={handleStartEditing}
-              onToggleUnit={() => setUnit((current) => (current === 'cm' ? 'in' : 'cm'))}
-              profile={selectedProfile}
-              selectedMeasurement={selectedMeasurement}
-              unit={unit}
-              visibleDefinitions={visibleDefinitions}
-            />
+            <AnimatePresence initial={false} mode="wait">
+              <motion.div
+                animate={{opacity: 1, y: 0}}
+                exit={
+                  prefersReducedMotion
+                    ? {opacity: 0}
+                    : {opacity: 0, y: 12, transition: {duration: 0.18, ease: decisiveEase}}
+                }
+                initial={prefersReducedMotion ? {opacity: 0} : {opacity: 0, y: 18}}
+                key={selectedProfile.id}
+                transition={
+                  prefersReducedMotion
+                    ? {duration: 0.01}
+                    : {duration: 0.34, ease: elegantEase}
+                }
+              >
+                <ProfileWorkspace
+                  currentMeasurement={currentMeasurement}
+                  currentView={currentView}
+                  onSelectMeasurement={handleSelectMeasurement}
+                  onSetCurrentView={setCurrentView}
+                  onStartEditing={handleStartEditing}
+                  onToggleUnit={() => setUnit((current) => (current === 'cm' ? 'in' : 'cm'))}
+                  profile={selectedProfile}
+                  selectedMeasurement={selectedMeasurement}
+                  unit={unit}
+                  visibleDefinitions={visibleDefinitions}
+                />
+              </motion.div>
+            </AnimatePresence>
           ) : (
             <div className="flex h-full items-center justify-center rounded-[2rem] bg-surface-container-low p-8 text-center">
               <div className="max-w-md">
@@ -570,6 +614,7 @@ function ProfileSwitcher({
 }) {
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) ?? null;
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (!isOpen) {
@@ -611,77 +656,137 @@ function ProfileSwitcher({
             {selectedProfile ? selectedProfile.name : profiles.length === 0 ? 'No profiles' : 'Profiles'}
           </span>
         </span>
-        <ChevronDown
-          className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          size={16}
-        />
+        <motion.span
+          animate={{rotate: isOpen ? 180 : 0}}
+          transition={
+            prefersReducedMotion
+              ? {duration: 0.01}
+              : {duration: 0.22, ease: elegantEase}
+          }
+        >
+          <ChevronDown size={16} />
+        </motion.span>
       </button>
 
-      {isOpen && profiles.length > 0 ? (
-        <div className="absolute right-0 z-40 mt-3 w-[20rem] overflow-hidden rounded-[1.5rem] bg-background/98 p-2 shadow-[0_24px_60px_-32px_rgba(3,25,46,0.34)] ring-1 ring-outline-variant/12 backdrop-blur-md">
-          <div className="px-3 pb-2 pt-1">
-            <p className="type-overline text-on-surface-variant">
-              Family profiles
-            </p>
-          </div>
-          <div className="space-y-1">
-            {profiles.map((profile) => {
-              const isActive = selectedProfileId === profile.id;
+      <AnimatePresence>
+        {isOpen && profiles.length > 0 ? (
+          <motion.div
+            animate="visible"
+            className="absolute right-0 z-40 mt-3 w-[20rem] overflow-hidden rounded-[1.5rem] bg-background/98 p-2 shadow-[0_24px_60px_-32px_rgba(3,25,46,0.34)] ring-1 ring-outline-variant/12 backdrop-blur-md"
+            exit="exit"
+            initial="hidden"
+            variants={
+              prefersReducedMotion
+                ? {
+                    hidden: {opacity: 0},
+                    visible: {opacity: 1, transition: {duration: 0.01}},
+                    exit: {opacity: 0, transition: {duration: 0.01}},
+                  }
+                : {
+                    hidden: {opacity: 0, y: -8, scale: 0.985},
+                    visible: {
+                      opacity: 1,
+                      y: 0,
+                      scale: 1,
+                      transition: {
+                        duration: 0.24,
+                        ease: elegantEase,
+                        when: 'beforeChildren',
+                        staggerChildren: 0.04,
+                      },
+                    },
+                    exit: {
+                      opacity: 0,
+                      y: -6,
+                      scale: 0.99,
+                      transition: {duration: 0.16, ease: decisiveEase},
+                    },
+                  }
+            }
+          >
+            <motion.div className="px-3 pb-2 pt-1" variants={fadeUpVariants}>
+              <p className="type-overline text-on-surface-variant">
+                Family profiles
+              </p>
+            </motion.div>
+            <div className="space-y-1">
+              {profiles.map((profile, index) => {
+                const isActive = selectedProfileId === profile.id;
 
-              return (
-                <div
-                  key={profile.id}
-                  className={`flex items-start justify-between gap-3 rounded-[1.15rem] px-3 py-3 transition-all ${
-                    isActive ? 'bg-primary text-white' : 'bg-transparent text-primary hover:bg-surface-container-low'
-                  }`}
-                >
-                  <button
-                    className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left"
-                    onClick={() => onSelectProfile(profile.id)}
-                    type="button"
+                return (
+                  <motion.div
+                    className={`flex items-start justify-between gap-3 rounded-[1.15rem] px-3 py-3 transition-all ${
+                      isActive ? 'bg-primary text-white' : 'bg-transparent text-primary hover:bg-surface-container-low'
+                    }`}
+                    key={profile.id}
+                    layout
+                    variants={fadeUpVariants}
+                    custom={index + 1}
                   >
-                    <div className="min-w-0">
-                      <p className="type-section-title max-w-full break-words text-[1.55rem] leading-[0.95]">
-                        {profile.name}
-                      </p>
-                      <p
-                        className={`type-label mt-1 ${
-                          isActive ? 'text-white/65' : 'text-on-surface-variant'
+                    <button
+                      className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left"
+                      onClick={() => onSelectProfile(profile.id)}
+                      type="button"
+                    >
+                      <div className="min-w-0">
+                        <p className="type-section-title max-w-full break-words text-[1.55rem] leading-[0.95]">
+                          {profile.name}
+                        </p>
+                        <p
+                          className={`type-label mt-1 ${
+                            isActive ? 'text-white/65' : 'text-on-surface-variant'
+                          }`}
+                        >
+                          {profile.sex} • {stripTrailingZeroes(profile.heightCm)} cm
+                        </p>
+                      </div>
+                      <AnimatePresence initial={false}>
+                        {isActive ? (
+                          <motion.div
+                            animate={{opacity: 1, scale: 1}}
+                            className="pt-1"
+                            exit={{opacity: 0, scale: 0.7}}
+                            initial={{opacity: 0, scale: 0.7}}
+                            transition={
+                              prefersReducedMotion
+                                ? {duration: 0.01}
+                                : {duration: 0.18, ease: decisiveEase}
+                            }
+                          >
+                            <Check size={16} />
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        className={`type-button rounded-full px-2.5 py-1 ${
+                          isActive ? 'bg-white/12 text-white' : 'bg-secondary-container/50 text-secondary'
                         }`}
+                        onClick={() => onEditProfile(profile.id)}
+                        type="button"
                       >
-                        {profile.sex} • {stripTrailingZeroes(profile.heightCm)} cm
-                      </p>
+                        Edit
+                      </button>
+                      <button
+                        aria-label={`Delete ${profile.name}`}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                          isActive ? 'bg-white/12 text-white' : 'bg-surface-container-low text-primary'
+                        }`}
+                        disabled={deletingProfileId === profile.id}
+                        onClick={() => onDeleteProfile(profile.id)}
+                        type="button"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                    <div className="pt-1">{isActive ? <Check size={16} /> : null}</div>
-                  </button>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      className={`type-button rounded-full px-2.5 py-1 ${
-                        isActive ? 'bg-white/12 text-white' : 'bg-secondary-container/50 text-secondary'
-                      }`}
-                      onClick={() => onEditProfile(profile.id)}
-                      type="button"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      aria-label={`Delete ${profile.name}`}
-                      className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                        isActive ? 'bg-white/12 text-white' : 'bg-surface-container-low text-primary'
-                      }`}
-                      disabled={deletingProfileId === profile.id}
-                      onClick={() => onDeleteProfile(profile.id)}
-                      type="button"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
@@ -712,10 +817,40 @@ function ProfileWorkspace({
   const selectedMeasurementValueCm = currentMeasurement
     ? profile.measurements[currentMeasurement.key]
     : null;
+  const prefersReducedMotion = useReducedMotion();
+  const previousHasCurrentMeasurementRef = useRef(Boolean(currentMeasurement));
+  const shouldAnimateGuidanceToggle =
+    previousHasCurrentMeasurementRef.current !== Boolean(currentMeasurement);
+
+  useEffect(() => {
+    previousHasCurrentMeasurementRef.current = Boolean(currentMeasurement);
+  }, [currentMeasurement]);
 
   return (
-    <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-[2.5rem] bg-[linear-gradient(180deg,rgba(244,244,239,0.88),rgba(250,250,245,0.96))] p-4 ring-1 ring-outline-variant/12 md:p-6 xl:p-8">
+    <motion.div
+      animate="visible"
+      className="space-y-6"
+      initial="hidden"
+      variants={
+        prefersReducedMotion
+          ? {
+              hidden: {},
+              visible: {
+                transition: {staggerChildren: 0},
+              },
+            }
+          : {
+              hidden: {},
+              visible: {
+                transition: {staggerChildren: 0.06, delayChildren: 0.04},
+              },
+            }
+      }
+    >
+      <motion.div
+        className="relative overflow-hidden rounded-[2.5rem] bg-[linear-gradient(180deg,rgba(244,244,239,0.88),rgba(250,250,245,0.96))] p-4 ring-1 ring-outline-variant/12 md:p-6 xl:p-8"
+        variants={fadeUpVariants}
+      >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(253,220,152,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(3,25,46,0.06),transparent_28%)]" />
         <div className="relative">
           <TechnicalMeasurementPlate
@@ -733,19 +868,62 @@ function ProfileWorkspace({
         </div>
 
         <div className="relative mt-6">
-          <div
+          <motion.div
+            animate={{
+              boxShadow: currentMeasurement
+                ? '0 18px 40px -24px rgba(36,88,92,0.34)'
+                : '0 0 0 0 rgba(36,88,92,0)',
+            }}
             className={`rounded-[1.9rem] p-5 transition-all ${
               currentMeasurement
                 ? 'bg-primary text-white ring-1 ring-guidance/28 shadow-[0_18px_40px_-24px_rgba(36,88,92,0.34)]'
                 : 'bg-white/74 text-primary ring-1 ring-outline-variant/12'
             }`}
+            layout={shouldAnimateGuidanceToggle}
+            transition={
+              prefersReducedMotion
+                ? {duration: 0.01}
+                : {
+                    layout: {duration: 0.5, ease: calmEase},
+                    boxShadow: {duration: 0.36, ease: calmEase},
+                  }
+            }
           >
-            {currentMeasurement ? (
-                <p className="type-note text-white/78">
-                  Tip: {currentMeasurement.guide}
-                </p>
+            <AnimatePresence initial={false} mode="sync">
+              {currentMeasurement ? (
+                <motion.div
+                  animate={
+                    shouldAnimateGuidanceToggle ? {opacity: 1, y: 0} : {opacity: 1, y: 0}
+                  }
+                  className="flex items-center"
+                  exit={shouldAnimateGuidanceToggle ? {opacity: 0, y: -4} : undefined}
+                  initial={shouldAnimateGuidanceToggle ? {opacity: 0, y: 6} : false}
+                  key="selected-guidance"
+                  transition={
+                    prefersReducedMotion
+                      ? {duration: 0.01}
+                      : {duration: 0.3, ease: calmEase}
+                  }
+                >
+                  <p className="type-note text-white/78">
+                    Tip: {currentMeasurement.guide}
+                  </p>
+                </motion.div>
               ) : (
-                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <motion.div
+                  animate={
+                    shouldAnimateGuidanceToggle ? {opacity: 1, y: 0} : {opacity: 1, y: 0}
+                  }
+                  className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+                  exit={shouldAnimateGuidanceToggle ? {opacity: 0, y: -4} : undefined}
+                  initial={shouldAnimateGuidanceToggle ? {opacity: 0, y: 6} : false}
+                  key="empty-guidance"
+                  transition={
+                    prefersReducedMotion
+                      ? {duration: 0.01}
+                      : {duration: 0.3, ease: calmEase}
+                  }
+                >
                   <div>
                     <p className="type-overline text-on-surface-variant">
                       Ready to inspect
@@ -754,16 +932,23 @@ function ProfileWorkspace({
                       Tap a callout on the plate to bring a measurement into focus. Saved measurements gain a gold accent on the diagram.
                     </p>
                   </div>
-                <div className="type-button rounded-full bg-secondary-container/45 px-4 py-2 text-secondary">
-                  {getCompletionSummary(profile)}
-                </div>
-              </div>
-            )}
-          </div>
+                  <motion.div
+                    className="type-button rounded-full bg-secondary-container/45 px-4 py-2 text-secondary"
+                    layout
+                  >
+                    {getCompletionSummary(profile)}
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="rounded-[2.2rem] bg-surface-container-low/78 p-4 ring-1 ring-outline-variant/10 md:p-5">
+      <motion.div
+        className="rounded-[2.2rem] bg-surface-container-low/78 p-4 ring-1 ring-outline-variant/10 md:p-5"
+        variants={fadeUpVariants}
+      >
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="type-overline text-on-surface-variant">
@@ -800,8 +985,8 @@ function ProfileWorkspace({
           <PencilLine size={15} />
           Edit selected measurement
         </button>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -820,8 +1005,29 @@ function MeasurementLedger({
   unit: Unit;
   visibleDefinitions: (typeof measurementDefinitions)[number][];
 }) {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
-    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+    <motion.div
+      className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3"
+      initial="hidden"
+      animate="visible"
+      variants={
+        prefersReducedMotion
+          ? {
+              hidden: {},
+              visible: {
+                transition: {staggerChildren: 0},
+              },
+            }
+          : {
+              hidden: {},
+              visible: {
+                transition: {staggerChildren: 0.045},
+              },
+            }
+      }
+    >
       {visibleDefinitions.map((definition) => {
         const isActive = selectedMeasurement === definition.key;
         const value = profile.measurements[definition.key];
@@ -843,11 +1049,13 @@ function MeasurementLedger({
             animate={
               isActive
                 ? {
+                    opacity: 1,
                     scale: 1,
                     y: -2,
                     boxShadow: '0 22px 40px -26px rgba(36,88,92,0.42)',
                   }
                 : {
+                    opacity: 1,
                     scale: 1,
                     y: 0,
                     boxShadow: '0 0 0 0 rgba(3,25,46,0)',
@@ -858,12 +1066,13 @@ function MeasurementLedger({
                 ? 'bg-primary text-white shadow-[0_18px_36px_-24px_rgba(36,88,92,0.42)] ring-1 ring-guidance/40'
                 : 'bg-white/72 text-primary ring-1 ring-outline-variant/10 hover:bg-white'
             }`}
-            initial={false}
+            initial={prefersReducedMotion ? false : {opacity: 0, y: 14}}
             key={definition.key}
+            layout
             onClick={handleCardClick}
             transition={{
               duration: 0.28,
-              ease: [0.22, 1, 0.36, 1],
+              ease: elegantEase,
             }}
             type="button"
           >
@@ -903,7 +1112,7 @@ function MeasurementLedger({
           </motion.button>
         );
       })}
-    </div>
+    </motion.div>
   );
 }
 
