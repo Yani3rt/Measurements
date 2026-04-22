@@ -1,8 +1,11 @@
+import 'dotenv/config';
 import express from 'express';
 import {
   createProfile,
   deleteProfile,
+  getMeasurementHistory,
   getProfile,
+  getProfileHeightHistory,
   listProfiles,
   saveMeasurement,
   updateProfile,
@@ -32,6 +35,12 @@ function sendError(
 
 function isValidSex(value: unknown): value is Sex {
   return value === 'female' || value === 'male';
+}
+
+function isValidProfileId(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
 function validateProfileInput(body: unknown) {
@@ -88,11 +97,17 @@ function validateMeasurementValue(body: unknown) {
   return null;
 }
 
-app.get('/api/profiles', (_request, response) => {
-  response.json({profiles: listProfiles()});
+app.get('/api/profiles', async (_request, response) => {
+  try {
+    response.json({profiles: await listProfiles()});
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unable to load profiles.';
+    sendError(response, 500, message);
+  }
 });
 
-app.post('/api/profiles', (request, response) => {
+app.post('/api/profiles', async (request, response) => {
   const validationError = validateProfileInput(request.body);
 
   if (validationError) {
@@ -111,7 +126,7 @@ app.post('/api/profiles', (request, response) => {
       : `profile-${Math.random().toString(36).slice(2, 10)}`;
 
   try {
-    const profile = createProfile(profileId, {
+    const profile = await createProfile(profileId, {
       heightCm,
       name: name.trim(),
       sex,
@@ -125,7 +140,7 @@ app.post('/api/profiles', (request, response) => {
   }
 });
 
-app.put('/api/profiles/:profileId', (request, response) => {
+app.put('/api/profiles/:profileId', async (request, response) => {
   const validationError = validateProfileInput(request.body);
 
   if (validationError) {
@@ -133,36 +148,59 @@ app.put('/api/profiles/:profileId', (request, response) => {
   }
 
   const {profileId} = request.params;
+
+  if (!isValidProfileId(profileId)) {
+    return sendError(response, 400, 'Profile ID is invalid.');
+  }
+
   const {heightCm, name, sex} = request.body as {
     heightCm: number;
     name: string;
     sex: Sex;
   };
 
-  const profile = updateProfile(profileId, {
-    heightCm,
-    name: name.trim(),
-    sex,
-  });
+  try {
+    const profile = await updateProfile(profileId, {
+      heightCm,
+      name: name.trim(),
+      sex,
+    });
 
-  if (!profile) {
-    return sendError(response, 404, 'Profile not found.');
+    if (!profile) {
+      return sendError(response, 404, 'Profile not found.');
+    }
+
+    response.json({profile});
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unable to update profile.';
+    sendError(response, 500, message);
   }
-
-  response.json({profile});
 });
 
-app.delete('/api/profiles/:profileId', (request, response) => {
-  const deleted = deleteProfile(request.params.profileId);
+app.delete('/api/profiles/:profileId', async (request, response) => {
+  const {profileId} = request.params;
 
-  if (!deleted) {
-    return sendError(response, 404, 'Profile not found.');
+  if (!isValidProfileId(profileId)) {
+    return sendError(response, 400, 'Profile ID is invalid.');
   }
 
-  response.json({deletedProfileId: request.params.profileId});
+  try {
+    const deleted = await deleteProfile(profileId);
+
+    if (!deleted) {
+      return sendError(response, 404, 'Profile not found.');
+    }
+
+    response.json({deletedProfileId: profileId});
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unable to delete profile.';
+    sendError(response, 500, message);
+  }
 });
 
-app.put('/api/profiles/:profileId/measurements/:measurementKey', (request, response) => {
+app.put('/api/profiles/:profileId/measurements/:measurementKey', async (request, response) => {
   const {measurementKey, profileId} = request.params;
   const validationError = validateMeasurementValue(request.body);
 
@@ -170,20 +208,94 @@ app.put('/api/profiles/:profileId/measurements/:measurementKey', (request, respo
     return sendError(response, 400, validationError);
   }
 
+  if (!isValidProfileId(profileId)) {
+    return sendError(response, 400, 'Profile ID is invalid.');
+  }
+
   if (!(measurementKey in measurementDefinitionsByKey)) {
     return sendError(response, 404, 'Measurement not found.');
   }
 
-  const profile = getProfile(profileId);
+  try {
+    const profile = await getProfile(profileId);
 
-  if (!profile) {
-    return sendError(response, 404, 'Profile not found.');
+    if (!profile) {
+      return sendError(response, 404, 'Profile not found.');
+    }
+
+    const {valueCm} = request.body as {valueCm: number};
+    const updatedProfile = await saveMeasurement(
+      profileId,
+      measurementKey as MeasurementKey,
+      valueCm,
+    );
+
+    response.json({profile: updatedProfile});
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unable to save measurement.';
+    sendError(response, 500, message);
+  }
+});
+
+app.get('/api/profiles/:profileId/height-history', async (request, response) => {
+  const {profileId} = request.params;
+
+  if (!isValidProfileId(profileId)) {
+    return sendError(response, 400, 'Profile ID is invalid.');
   }
 
-  const {valueCm} = request.body as {valueCm: number};
-  const updatedProfile = saveMeasurement(profileId, measurementKey as MeasurementKey, valueCm);
+  try {
+    const profile = await getProfile(profileId);
 
-  response.json({profile: updatedProfile});
+    if (!profile) {
+      return sendError(response, 404, 'Profile not found.');
+    }
+
+    const entries = await getProfileHeightHistory(profileId);
+
+    response.json({
+      entries,
+      profileId,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unable to load profile height history.';
+    sendError(response, 500, message);
+  }
+});
+
+app.get('/api/profiles/:profileId/measurements/:measurementKey/history', async (request, response) => {
+  const {measurementKey, profileId} = request.params;
+
+  if (!isValidProfileId(profileId)) {
+    return sendError(response, 400, 'Profile ID is invalid.');
+  }
+
+  if (!(measurementKey in measurementDefinitionsByKey)) {
+    return sendError(response, 404, 'Measurement not found.');
+  }
+
+  try {
+    const profile = await getProfile(profileId);
+
+    if (!profile) {
+      return sendError(response, 404, 'Profile not found.');
+    }
+
+    const entries = await getMeasurementHistory(profileId, measurementKey as MeasurementKey);
+
+    response.json({
+      entries,
+      measurementKey,
+      measurementLabel: measurementDefinitionsByKey[measurementKey as MeasurementKey].label,
+      profileId,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unable to load measurement history.';
+    sendError(response, 500, message);
+  }
 });
 
 app.listen(port, host, () => {

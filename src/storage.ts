@@ -19,6 +19,32 @@ type MeasurementPayload = {
   valueCm: number;
 };
 
+export type ProfileHeightHistoryEntry = {
+  changedAt: string;
+  eventType: 'insert' | 'update';
+  heightCm: number;
+  previousHeightCm: number | null;
+};
+
+export type ProfileHeightHistoryResponse = {
+  profileId: string;
+  entries: ProfileHeightHistoryEntry[];
+};
+
+export type MeasurementHistoryEntry = {
+  changedAt: string;
+  eventType: 'insert' | 'update' | 'delete';
+  previousValueCm: number | null;
+  valueCm: number | null;
+};
+
+export type MeasurementHistoryResponse = {
+  profileId: string;
+  measurementKey: MeasurementKey;
+  measurementLabel: string;
+  entries: MeasurementHistoryEntry[];
+};
+
 const SERVICE_UNAVAILABLE_MESSAGE =
   'The local data service is unavailable. Start it with pnpm dev and try again.';
 
@@ -106,4 +132,19 @@ export async function saveMeasurement(
   );
 
   return hydrateProfiles([data.profile])[0];
+}
+
+export async function loadProfileHeightHistory(profileId: string) {
+  return requestJson<ProfileHeightHistoryResponse>(
+    `/api/profiles/${profileId}/height-history`,
+  );
+}
+
+export async function loadMeasurementHistory(
+  profileId: string,
+  measurementKey: MeasurementKey,
+) {
+  return requestJson<MeasurementHistoryResponse>(
+    `/api/profiles/${profileId}/measurements/${measurementKey}/history`,
+  );
 }

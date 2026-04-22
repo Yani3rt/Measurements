@@ -1,23 +1,6 @@
-import {mkdirSync} from 'node:fs';
-import path from 'node:path';
-import {DatabaseSync} from 'node:sqlite';
-import {createEmptyMeasurements, measurementDefinitionsByKey} from '../src/measurements.ts';
+import postgres from 'postgres';
+import {createEmptyMeasurements} from '../src/measurements.ts';
 import type {MeasurementKey, Measurements, Profile, Sex} from '../src/types.ts';
-
-type ProfileRow = {
-  created_at: string;
-  height_cm: number;
-  id: string;
-  name: string;
-  sex: Sex;
-  updated_at: string;
-};
-
-type MeasurementRow = {
-  measurement_key: MeasurementKey;
-  profile_id: string;
-  value_cm: number;
-};
 
 export type ProfileInput = {
   heightCm: number;
@@ -25,47 +8,90 @@ export type ProfileInput = {
   sex: Sex;
 };
 
-const dataDirectory = path.resolve(process.cwd(), 'data');
-export const databasePath = path.join(dataDirectory, 'the-atelier.sqlite');
+type TimestampValue = string | Date;
 
-mkdirSync(dataDirectory, {recursive: true});
+type ProfileRow = {
+  created_at: TimestampValue;
+  height_cm: number | string;
+  id: string;
+  name: string;
+  sex: Sex;
+  updated_at: TimestampValue;
+};
 
-const database = new DatabaseSync(databasePath);
+type MeasurementRow = {
+  measurement_key: MeasurementKey;
+  profile_id: string;
+  value_cm: number | string;
+};
 
-database.exec(`
-  PRAGMA foreign_keys = ON;
+type ProfileHeightHistoryRow = {
+  changed_at: TimestampValue;
+  event_type: 'insert' | 'update';
+  height_cm: number | string;
+  previous_height_cm: number | string | null;
+};
 
-  CREATE TABLE IF NOT EXISTS profiles (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    sex TEXT NOT NULL CHECK (sex IN ('female', 'male')),
-    height_cm REAL NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+type MeasurementHistoryRow = {
+  changed_at: TimestampValue;
+  event_type: 'insert' | 'update' | 'delete';
+  previous_value_cm: number | string | null;
+  value_cm: number | string | null;
+};
+
+export type ProfileHeightHistoryEntry = {
+  changedAt: string;
+  eventType: 'insert' | 'update';
+  heightCm: number;
+  previousHeightCm: number | null;
+};
+
+export type MeasurementHistoryEntry = {
+  changedAt: string;
+  eventType: 'insert' | 'update' | 'delete';
+  previousValueCm: number | null;
+  valueCm: number | null;
+};
+
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error(
+    'DATABASE_URL is required. Use the Supabase Postgres connection string before starting the data service.',
   );
+}
 
-  CREATE TABLE IF NOT EXISTS measurements (
-    profile_id TEXT NOT NULL,
-    measurement_key TEXT NOT NULL,
-    value_cm REAL NOT NULL DEFAULT 0,
-    updated_at TEXT NOT NULL,
-    PRIMARY KEY (profile_id, measurement_key),
-    FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
-  );
+const {hostname} = new URL(databaseUrl);
+const usesLocalDatabase = hostname === '127.0.0.1' || hostname === 'localhost';
 
-  CREATE INDEX IF NOT EXISTS idx_profiles_created_at ON profiles(created_at DESC);
-  CREATE INDEX IF NOT EXISTS idx_measurements_profile_id ON measurements(profile_id);
-`);
+const sql = postgres(databaseUrl, {
+  idle_timeout: 20,
+  max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+  prepare: false,
+  ssl: usesLocalDatabase ? false : 'require',
+});
+
+function toIsoString(value: TimestampValue) {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function toNumber(value: number | string) {
+  return typeof value === 'number' ? value : Number(value);
+}
+
+function toNullableNumber(value: number | string | null) {
+  return value === null ? null : toNumber(value);
+}
 
 function mapProfile(row: ProfileRow, measurements: Measurements): Profile {
   return {
-    createdAt: row.created_at,
-    heightCm: row.height_cm,
+    createdAt: toIsoString(row.created_at),
+    heightCm: toNumber(row.height_cm),
     id: row.id,
     measurements,
     name: row.name,
     sex: row.sex,
-    updatedAt: row.updated_at,
+    updatedAt: toIsoString(row.updated_at),
   };
 }
 
@@ -74,33 +100,38 @@ function buildMeasurementMap(rows: MeasurementRow[]) {
 
   for (const row of rows) {
     const current = profiles.get(row.profile_id) ?? createEmptyMeasurements();
-    current[row.measurement_key] = row.value_cm;
+    current[row.measurement_key] = toNumber(row.value_cm);
     profiles.set(row.profile_id, current);
   }
 
   return profiles;
 }
 
-export function listProfiles() {
-  const profileRows = database
-    .prepare(
-      `
-        SELECT id, name, sex, height_cm, created_at, updated_at
-        FROM profiles
-        ORDER BY datetime(created_at) DESC, id DESC
-      `,
-    )
-    .all() as ProfileRow[];
+async function loadMeasurements(profileIds: string[]) {
+  if (profileIds.length === 0) {
+    return [] as MeasurementRow[];
+  }
 
-  const measurementRows = database
-    .prepare(
-      `
-        SELECT profile_id, measurement_key, value_cm
-        FROM measurements
-      `,
-    )
-    .all() as MeasurementRow[];
+  return sql<MeasurementRow[]>`
+    SELECT profile_id, measurement_key, value_cm
+    FROM public.measurements
+    WHERE profile_id IN ${sql(profileIds)}
+  `;
+}
 
+async function getProfileMeasurements(profileId: string) {
+  const measurementRows = await loadMeasurements([profileId]);
+  return buildMeasurementMap(measurementRows).get(profileId) ?? createEmptyMeasurements();
+}
+
+export async function listProfiles() {
+  const profileRows = await sql<ProfileRow[]>`
+    SELECT id, name, sex, height_cm, created_at, updated_at
+    FROM public.profiles
+    ORDER BY created_at DESC, id DESC
+  `;
+
+  const measurementRows = await loadMeasurements(profileRows.map((row) => row.id));
   const measurementsByProfile = buildMeasurementMap(measurementRows);
 
   return profileRows.map((row) =>
@@ -108,122 +139,108 @@ export function listProfiles() {
   );
 }
 
-export function getProfile(profileId: string) {
-  const profileRow = database
-    .prepare(
-      `
-        SELECT id, name, sex, height_cm, created_at, updated_at
-        FROM profiles
-        WHERE id = ?
-      `,
-    )
-    .get(profileId) as ProfileRow | undefined;
+export async function getProfile(profileId: string) {
+  const profileRows = await sql<ProfileRow[]>`
+    SELECT id, name, sex, height_cm, created_at, updated_at
+    FROM public.profiles
+    WHERE id = ${profileId}::uuid
+  `;
+
+  const profileRow = profileRows[0];
 
   if (!profileRow) {
     return null;
   }
 
-  const measurementRows = database
-    .prepare(
-      `
-        SELECT profile_id, measurement_key, value_cm
-        FROM measurements
-        WHERE profile_id = ?
-      `,
-    )
-    .all(profileId) as MeasurementRow[];
-
-  const measurements = buildMeasurementMap(measurementRows).get(profileId) ?? createEmptyMeasurements();
-
+  const measurements = await getProfileMeasurements(profileId);
   return mapProfile(profileRow, measurements);
 }
 
-export function createProfile(profileId: string, input: ProfileInput) {
-  const now = new Date().toISOString();
+export async function createProfile(profileId: string, input: ProfileInput) {
+  const profileRows = await sql<ProfileRow[]>`
+    INSERT INTO public.profiles (id, name, sex, height_cm)
+    VALUES (${profileId}::uuid, ${input.name}, ${input.sex}, ${input.heightCm})
+    RETURNING id, name, sex, height_cm, created_at, updated_at
+  `;
 
-  database
-    .prepare(
-      `
-        INSERT INTO profiles (id, name, sex, height_cm, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `,
-    )
-    .run(profileId, input.name, input.sex, input.heightCm, now, now);
+  const profileRow = profileRows[0];
 
-  const insertMeasurement = database.prepare(
-    `
-      INSERT INTO measurements (profile_id, measurement_key, value_cm, updated_at)
-      VALUES (?, ?, 0, ?)
-    `,
-  );
-
-  for (const measurementKey of Object.keys(measurementDefinitionsByKey) as MeasurementKey[]) {
-    insertMeasurement.run(profileId, measurementKey, now);
-  }
-
-  return getProfile(profileId);
+  return mapProfile(profileRow, createEmptyMeasurements());
 }
 
-export function updateProfile(profileId: string, input: ProfileInput) {
-  const now = new Date().toISOString();
-  const result = database
-    .prepare(
-      `
-        UPDATE profiles
-        SET name = ?, sex = ?, height_cm = ?, updated_at = ?
-        WHERE id = ?
-      `,
-    )
-    .run(input.name, input.sex, input.heightCm, now, profileId);
+export async function updateProfile(profileId: string, input: ProfileInput) {
+  const profileRows = await sql<ProfileRow[]>`
+    UPDATE public.profiles
+    SET name = ${input.name}, sex = ${input.sex}, height_cm = ${input.heightCm}
+    WHERE id = ${profileId}::uuid
+    RETURNING id, name, sex, height_cm, created_at, updated_at
+  `;
 
-  if (result.changes === 0) {
+  const profileRow = profileRows[0];
+
+  if (!profileRow) {
     return null;
   }
 
-  return getProfile(profileId);
+  const measurements = await getProfileMeasurements(profileId);
+  return mapProfile(profileRow, measurements);
 }
 
-export function deleteProfile(profileId: string) {
-  const result = database
-    .prepare(
-      `
-        DELETE FROM profiles
-        WHERE id = ?
-      `,
-    )
-    .run(profileId);
+export async function deleteProfile(profileId: string) {
+  const result = await sql`
+    DELETE FROM public.profiles
+    WHERE id = ${profileId}::uuid
+  `;
 
-  return result.changes > 0;
+  return result.count > 0;
 }
 
-export function saveMeasurement(profileId: string, measurementKey: MeasurementKey, valueCm: number) {
-  const now = new Date().toISOString();
-  const profile = getProfile(profileId);
+export async function saveMeasurement(profileId: string, measurementKey: MeasurementKey, valueCm: number) {
+  const profile = await getProfile(profileId);
 
   if (!profile) {
     return null;
   }
 
-  database
-    .prepare(
-      `
-        INSERT INTO measurements (profile_id, measurement_key, value_cm, updated_at)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(profile_id, measurement_key)
-        DO UPDATE SET value_cm = excluded.value_cm, updated_at = excluded.updated_at
-      `,
-    )
-    .run(profileId, measurementKey, valueCm, now);
-
-  database
-    .prepare(
-      `
-        UPDATE profiles
-        SET updated_at = ?
-        WHERE id = ?
-      `,
-    )
-    .run(now, profileId);
+  await sql`
+    INSERT INTO public.measurements (profile_id, measurement_key, value_cm)
+    VALUES (${profileId}::uuid, ${measurementKey}, ${valueCm})
+    ON CONFLICT (profile_id, measurement_key)
+    DO UPDATE SET value_cm = EXCLUDED.value_cm
+  `;
 
   return getProfile(profileId);
+}
+
+export async function getProfileHeightHistory(profileId: string) {
+  const rows = await sql<ProfileHeightHistoryRow[]>`
+    SELECT event_type, previous_height_cm, height_cm, changed_at
+    FROM public.profile_height_history
+    WHERE profile_id = ${profileId}::uuid
+    ORDER BY changed_at ASC, id ASC
+  `;
+
+  return rows.map((row) => ({
+    changedAt: toIsoString(row.changed_at),
+    eventType: row.event_type,
+    heightCm: toNumber(row.height_cm),
+    previousHeightCm: toNullableNumber(row.previous_height_cm),
+  })) satisfies ProfileHeightHistoryEntry[];
+}
+
+export async function getMeasurementHistory(profileId: string, measurementKey: MeasurementKey) {
+  const rows = await sql<MeasurementHistoryRow[]>`
+    SELECT event_type, previous_value_cm, value_cm, changed_at
+    FROM public.measurement_history
+    WHERE profile_id = ${profileId}::uuid
+      AND measurement_key = ${measurementKey}
+    ORDER BY changed_at ASC, id ASC
+  `;
+
+  return rows.map((row) => ({
+    changedAt: toIsoString(row.changed_at),
+    eventType: row.event_type,
+    previousValueCm: toNullableNumber(row.previous_value_cm),
+    valueCm: toNullableNumber(row.value_cm),
+  })) satisfies MeasurementHistoryEntry[];
 }
