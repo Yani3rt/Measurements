@@ -47,7 +47,7 @@ export function MeasurementRuler({
   const badgeValue = selectedLabel
     ? hasRecordedValue && recordedValue !== null
       ? `${stripTrailingZeroes(recordedValue)} ${unit}`
-      : 'Pending'
+      : 'Add'
     : 'Select one';
   const mobileBadgeValue = selectedLabel ? badgeValue : 'Select';
   const rulerTransition = prefersReducedMotion

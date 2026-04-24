@@ -1,4 +1,5 @@
 import {createEmptyMeasurements} from './measurements';
+import {getSupabaseBrowserClient, isSupabaseAuthConfigured} from './supabase';
 import type {MeasurementKey, Profile, Sex} from './types';
 
 type ProfilesResponse = {
@@ -62,9 +63,29 @@ function hydrateProfiles(profiles: Profile[]) {
 
 async function requestJson<T>(path: string, init?: RequestInit) {
   try {
+    if (!isSupabaseAuthConfigured) {
+      throw new Error(
+        'Supabase Auth is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+      );
+    }
+
+    const {
+      data: {session},
+      error: sessionError,
+    } = await getSupabaseBrowserClient().auth.getSession();
+
+    if (sessionError) {
+      throw sessionError;
+    }
+
+    if (!session?.access_token) {
+      throw new Error('Sign in with Google to access profile data.');
+    }
+
     const response = await fetch(path, {
       ...init,
       headers: {
+        Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
         ...init?.headers,
       },

@@ -17,6 +17,7 @@ type ProfileRow = {
   name: string;
   sex: Sex;
   updated_at: TimestampValue;
+  user_id: string | null;
 };
 
 type MeasurementRow = {
@@ -124,10 +125,11 @@ async function getProfileMeasurements(profileId: string) {
   return buildMeasurementMap(measurementRows).get(profileId) ?? createEmptyMeasurements();
 }
 
-export async function listProfiles() {
+export async function listProfiles(userId: string) {
   const profileRows = await sql<ProfileRow[]>`
-    SELECT id, name, sex, height_cm, created_at, updated_at
+    SELECT id, name, sex, height_cm, created_at, updated_at, user_id
     FROM public.profiles
+    WHERE user_id = ${userId}::uuid
     ORDER BY created_at DESC, id DESC
   `;
 
@@ -139,11 +141,12 @@ export async function listProfiles() {
   );
 }
 
-export async function getProfile(profileId: string) {
+export async function getProfile(profileId: string, userId: string) {
   const profileRows = await sql<ProfileRow[]>`
-    SELECT id, name, sex, height_cm, created_at, updated_at
+    SELECT id, name, sex, height_cm, created_at, updated_at, user_id
     FROM public.profiles
     WHERE id = ${profileId}::uuid
+      AND user_id = ${userId}::uuid
   `;
 
   const profileRow = profileRows[0];
@@ -156,11 +159,11 @@ export async function getProfile(profileId: string) {
   return mapProfile(profileRow, measurements);
 }
 
-export async function createProfile(profileId: string, input: ProfileInput) {
+export async function createProfile(profileId: string, userId: string, input: ProfileInput) {
   const profileRows = await sql<ProfileRow[]>`
-    INSERT INTO public.profiles (id, name, sex, height_cm)
-    VALUES (${profileId}::uuid, ${input.name}, ${input.sex}, ${input.heightCm})
-    RETURNING id, name, sex, height_cm, created_at, updated_at
+    INSERT INTO public.profiles (id, user_id, name, sex, height_cm)
+    VALUES (${profileId}::uuid, ${userId}::uuid, ${input.name}, ${input.sex}, ${input.heightCm})
+    RETURNING id, name, sex, height_cm, created_at, updated_at, user_id
   `;
 
   const profileRow = profileRows[0];
@@ -168,12 +171,13 @@ export async function createProfile(profileId: string, input: ProfileInput) {
   return mapProfile(profileRow, createEmptyMeasurements());
 }
 
-export async function updateProfile(profileId: string, input: ProfileInput) {
+export async function updateProfile(profileId: string, userId: string, input: ProfileInput) {
   const profileRows = await sql<ProfileRow[]>`
     UPDATE public.profiles
     SET name = ${input.name}, sex = ${input.sex}, height_cm = ${input.heightCm}
     WHERE id = ${profileId}::uuid
-    RETURNING id, name, sex, height_cm, created_at, updated_at
+      AND user_id = ${userId}::uuid
+    RETURNING id, name, sex, height_cm, created_at, updated_at, user_id
   `;
 
   const profileRow = profileRows[0];
@@ -186,17 +190,23 @@ export async function updateProfile(profileId: string, input: ProfileInput) {
   return mapProfile(profileRow, measurements);
 }
 
-export async function deleteProfile(profileId: string) {
+export async function deleteProfile(profileId: string, userId: string) {
   const result = await sql`
     DELETE FROM public.profiles
     WHERE id = ${profileId}::uuid
+      AND user_id = ${userId}::uuid
   `;
 
   return result.count > 0;
 }
 
-export async function saveMeasurement(profileId: string, measurementKey: MeasurementKey, valueCm: number) {
-  const profile = await getProfile(profileId);
+export async function saveMeasurement(
+  profileId: string,
+  userId: string,
+  measurementKey: MeasurementKey,
+  valueCm: number,
+) {
+  const profile = await getProfile(profileId, userId);
 
   if (!profile) {
     return null;
@@ -209,15 +219,18 @@ export async function saveMeasurement(profileId: string, measurementKey: Measure
     DO UPDATE SET value_cm = EXCLUDED.value_cm
   `;
 
-  return getProfile(profileId);
+  return getProfile(profileId, userId);
 }
 
-export async function getProfileHeightHistory(profileId: string) {
+export async function getProfileHeightHistory(profileId: string, userId: string) {
   const rows = await sql<ProfileHeightHistoryRow[]>`
-    SELECT event_type, previous_height_cm, height_cm, changed_at
-    FROM public.profile_height_history
-    WHERE profile_id = ${profileId}::uuid
-    ORDER BY changed_at ASC, id ASC
+    SELECT history.event_type, history.previous_height_cm, history.height_cm, history.changed_at
+    FROM public.profile_height_history AS history
+    INNER JOIN public.profiles AS profile
+      ON profile.id = history.profile_id
+    WHERE history.profile_id = ${profileId}::uuid
+      AND profile.user_id = ${userId}::uuid
+    ORDER BY history.changed_at ASC, history.id ASC
   `;
 
   return rows.map((row) => ({
@@ -228,13 +241,20 @@ export async function getProfileHeightHistory(profileId: string) {
   })) satisfies ProfileHeightHistoryEntry[];
 }
 
-export async function getMeasurementHistory(profileId: string, measurementKey: MeasurementKey) {
+export async function getMeasurementHistory(
+  profileId: string,
+  userId: string,
+  measurementKey: MeasurementKey,
+) {
   const rows = await sql<MeasurementHistoryRow[]>`
-    SELECT event_type, previous_value_cm, value_cm, changed_at
-    FROM public.measurement_history
-    WHERE profile_id = ${profileId}::uuid
-      AND measurement_key = ${measurementKey}
-    ORDER BY changed_at ASC, id ASC
+    SELECT history.event_type, history.previous_value_cm, history.value_cm, history.changed_at
+    FROM public.measurement_history AS history
+    INNER JOIN public.profiles AS profile
+      ON profile.id = history.profile_id
+    WHERE history.profile_id = ${profileId}::uuid
+      AND history.measurement_key = ${measurementKey}
+      AND profile.user_id = ${userId}::uuid
+    ORDER BY history.changed_at ASC, history.id ASC
   `;
 
   return rows.map((row) => ({

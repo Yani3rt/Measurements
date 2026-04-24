@@ -18,12 +18,14 @@ import {
   MAX_PROFILE_NAME_LENGTH,
   MIN_HEIGHT_CM,
 } from '../src/validation.ts';
+import {requireAuthenticatedUser} from './auth.ts';
 
 const app = express();
 const host = '127.0.0.1';
 const port = Number(process.env.DATA_SERVICE_PORT ?? 3101);
 
 app.use(express.json());
+app.use('/api', requireAuthenticatedUser);
 
 function sendError(
   response: express.Response,
@@ -99,7 +101,7 @@ function validateMeasurementValue(body: unknown) {
 
 app.get('/api/profiles', async (_request, response) => {
   try {
-    response.json({profiles: await listProfiles()});
+    response.json({profiles: await listProfiles(_request.authUser!.id)});
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Unable to load profiles.';
@@ -126,7 +128,7 @@ app.post('/api/profiles', async (request, response) => {
       : `profile-${Math.random().toString(36).slice(2, 10)}`;
 
   try {
-    const profile = await createProfile(profileId, {
+    const profile = await createProfile(profileId, request.authUser!.id, {
       heightCm,
       name: name.trim(),
       sex,
@@ -160,7 +162,7 @@ app.put('/api/profiles/:profileId', async (request, response) => {
   };
 
   try {
-    const profile = await updateProfile(profileId, {
+    const profile = await updateProfile(profileId, request.authUser!.id, {
       heightCm,
       name: name.trim(),
       sex,
@@ -186,7 +188,7 @@ app.delete('/api/profiles/:profileId', async (request, response) => {
   }
 
   try {
-    const deleted = await deleteProfile(profileId);
+    const deleted = await deleteProfile(profileId, request.authUser!.id);
 
     if (!deleted) {
       return sendError(response, 404, 'Profile not found.');
@@ -217,7 +219,7 @@ app.put('/api/profiles/:profileId/measurements/:measurementKey', async (request,
   }
 
   try {
-    const profile = await getProfile(profileId);
+    const profile = await getProfile(profileId, request.authUser!.id);
 
     if (!profile) {
       return sendError(response, 404, 'Profile not found.');
@@ -226,6 +228,7 @@ app.put('/api/profiles/:profileId/measurements/:measurementKey', async (request,
     const {valueCm} = request.body as {valueCm: number};
     const updatedProfile = await saveMeasurement(
       profileId,
+      request.authUser!.id,
       measurementKey as MeasurementKey,
       valueCm,
     );
@@ -246,13 +249,13 @@ app.get('/api/profiles/:profileId/height-history', async (request, response) => 
   }
 
   try {
-    const profile = await getProfile(profileId);
+    const profile = await getProfile(profileId, request.authUser!.id);
 
     if (!profile) {
       return sendError(response, 404, 'Profile not found.');
     }
 
-    const entries = await getProfileHeightHistory(profileId);
+    const entries = await getProfileHeightHistory(profileId, request.authUser!.id);
 
     response.json({
       entries,
@@ -277,13 +280,17 @@ app.get('/api/profiles/:profileId/measurements/:measurementKey/history', async (
   }
 
   try {
-    const profile = await getProfile(profileId);
+    const profile = await getProfile(profileId, request.authUser!.id);
 
     if (!profile) {
       return sendError(response, 404, 'Profile not found.');
     }
 
-    const entries = await getMeasurementHistory(profileId, measurementKey as MeasurementKey);
+    const entries = await getMeasurementHistory(
+      profileId,
+      request.authUser!.id,
+      measurementKey as MeasurementKey,
+    );
 
     response.json({
       entries,

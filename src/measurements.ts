@@ -36,7 +36,7 @@ export const measurementDefinitions: MeasurementDefinition[] = [
   },
   {
     key: 'shoulderCircumference',
-    label: 'Shoulder circumference',
+    label: 'Shoulder',
     view: 'front',
     guide: 'Measure around the shoulder line at the upper torso.',
     tone: 'primary',

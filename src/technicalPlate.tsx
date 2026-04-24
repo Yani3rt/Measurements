@@ -1,3 +1,4 @@
+import {useEffect, useRef, useState} from 'react';
 import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
 import {ArrowRightLeft} from 'lucide-react';
 import frontAsset from '../front.svg';
@@ -102,6 +103,14 @@ export function TechnicalMeasurementPlate({
   const callouts = calloutsByView[currentView];
   const activeCallout = callouts.find((callout) => callout.key === selectedMeasurement) ?? null;
   const prefersReducedMotion = useReducedMotion();
+  const hasPlayedInitialFrontIntroRef = useRef(false);
+  const [frontIntroCycle, setFrontIntroCycle] = useState(0);
+  const [hoveredMeasurement, setHoveredMeasurement] = useState<MeasurementKey | null>(null);
+  const shouldRunInitialFrontIntro =
+    !prefersReducedMotion &&
+    currentView === 'front' &&
+    !hasPlayedInitialFrontIntroRef.current &&
+    frontIntroCycle === 0;
   const stateTransition = prefersReducedMotion
     ? {duration: 0.01}
     : {duration: 0.26, ease: easeOutQuint};
@@ -115,6 +124,26 @@ export function TechnicalMeasurementPlate({
   const settleTransition = prefersReducedMotion
     ? {duration: 0.01}
     : {type: 'spring', stiffness: 310, damping: 28, mass: 0.72};
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      return;
+    }
+
+    if (currentView !== 'front' || hasPlayedInitialFrontIntroRef.current) {
+      return;
+    }
+
+    hasPlayedInitialFrontIntroRef.current = true;
+
+    const timeoutId = window.setTimeout(() => {
+      setFrontIntroCycle((current) => current + 1);
+    }, 160);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [currentView, prefersReducedMotion]);
 
   return (
     <div className="relative overflow-hidden rounded-[2.35rem] border border-primary/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(248,246,239,0.95))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] sm:p-4">
@@ -180,6 +209,10 @@ export function TechnicalMeasurementPlate({
           <pattern height="28" id="plate-grid" patternUnits="userSpaceOnUse" width="28">
             <path d="M 28 0 L 0 0 0 28" fill="none" stroke="rgba(32,56,74,0.065)" strokeWidth="1" />
           </pattern>
+          <pattern height="7" id="paper-grain" patternUnits="userSpaceOnUse" width="7">
+            <path d="M0 6 L7 0" stroke="rgba(139,107,40,0.035)" strokeWidth="0.75" />
+            <circle cx="1.5" cy="1.5" fill="rgba(32,56,74,0.035)" r="0.42" />
+          </pattern>
           <filter id="plate-glow">
             <feGaussianBlur result="coloredBlur" stdDeviation="5" />
             <feMerge>
@@ -191,8 +224,15 @@ export function TechnicalMeasurementPlate({
 
         <rect fill="url(#plate-wash)" height="760" rx="32" width="560" />
         <rect fill="url(#plate-grid)" height="760" opacity="0.7" width="560" />
+        <rect fill="url(#paper-grain)" height="760" opacity="0.72" width="560" />
         <path d="M28 120 C112 54 214 28 340 36 C452 42 516 78 532 132" fill="none" opacity="0.32" stroke="rgba(139,107,40,0.28)" strokeWidth="1.5" />
         <path d="M38 680 C142 720 262 734 394 712 C462 700 504 682 526 660" fill="none" opacity="0.18" stroke="rgba(32,56,74,0.16)" strokeWidth="1.5" />
+        <path d="M86 154 C178 112 382 112 474 154" fill="none" opacity="0.2" stroke="rgba(139,107,40,0.22)" strokeDasharray="1 9" strokeLinecap="round" strokeWidth="1.2" />
+        <path d="M92 626 C170 672 386 672 468 626" fill="none" opacity="0.18" stroke="rgba(139,107,40,0.2)" strokeDasharray="1 9" strokeLinecap="round" strokeWidth="1.2" />
+        <g opacity="0.26" stroke="rgba(32,56,74,0.2)" strokeLinecap="round" strokeWidth="1">
+          <path d="M116 198 l12 0 M110 204 l18 0 M432 198 l12 0 M432 204 l18 0" />
+          <path d="M118 560 l16 0 M426 560 l16 0 M126 566 l8 0 M426 566 l8 0" />
+        </g>
 
         <g opacity="0.9">
           <path d="M280 136 L280 710" fill="none" stroke="rgba(32,56,74,0.12)" strokeDasharray="4 8" strokeWidth="1.5" />
@@ -202,7 +242,7 @@ export function TechnicalMeasurementPlate({
           <circle cx="280" cy="490" fill="rgba(139,107,40,0.18)" r="3.5" />
         </g>
 
-        <AnimatePresence initial={false} mode="sync">
+        <AnimatePresence initial={shouldRunInitialFrontIntro} mode="sync">
           <motion.g
             animate={{x: 0}}
             exit={{}}
@@ -213,7 +253,7 @@ export function TechnicalMeasurementPlate({
                     x: currentView === 'front' ? 6 : -6,
                   }
             }
-            key={currentView}
+            key={`${currentView}-${frontIntroCycle}`}
             transition={
               prefersReducedMotion
                 ? {duration: 0.01}
@@ -298,18 +338,19 @@ export function TechnicalMeasurementPlate({
           />
         ) : null}
 
-        <AnimatePresence initial={false} mode="sync">
+        <AnimatePresence initial={shouldRunInitialFrontIntro} mode="sync">
           <motion.g
             animate={prefersReducedMotion ? undefined : 'visible'}
             initial={prefersReducedMotion ? undefined : 'hidden'}
-            key={`callout-set-${currentView}`}
+            key={`callout-set-${currentView}-${frontIntroCycle}`}
             variants={prefersReducedMotion ? undefined : calloutSetVariants}
           >
             {callouts.map((callout, index) => {
               const isSelected = selectedMeasurement === callout.key;
+              const isHovered = hoveredMeasurement === callout.key;
               const isMeasured = profile.measurements[callout.key] > 0;
-              const chipLift = isSelected && !prefersReducedMotion ? -2.5 : 0;
-              const chipTransition = isSelected && !prefersReducedMotion
+              const chipLift = (isSelected || isHovered) && !prefersReducedMotion ? -3 : 0;
+              const chipTransition = (isSelected || isHovered) && !prefersReducedMotion
                 ? {...settleTransition, delay: 0.24}
                 : settleTransition;
               const entranceDelay = prefersReducedMotion ? 0 : 0.12 + index * 0.12;
@@ -323,18 +364,36 @@ export function TechnicalMeasurementPlate({
                 <motion.g
                   aria-label={callout.labelLines.join(' ')}
                   key={`${currentView}-${callout.key}`}
+                  onMouseEnter={() => setHoveredMeasurement(callout.key)}
+                  onMouseLeave={() => setHoveredMeasurement(null)}
                   onClick={() => onSelectMeasurement(callout.key)}
                   style={{cursor: 'pointer'}}
                 >
+                  {!prefersReducedMotion && isHovered && !isSelected ? (
+                    <motion.path
+                      animate={{opacity: 0.42, pathLength: 1}}
+                      d={callout.pathD}
+                      fill="none"
+                      initial={{opacity: 0, pathLength: 0.1}}
+                      pointerEvents="none"
+                      stroke={guidanceSoft}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="5"
+                      transition={{duration: 0.24, ease: easeOutQuint}}
+                    />
+                  ) : null}
                   <motion.path
                     animate={{
-                      opacity: isSelected ? 0.96 : isMeasured ? 0.96 : 0.88,
+                      opacity: isSelected ? 0.98 : isHovered ? 0.96 : isMeasured ? 0.96 : 0.82,
                       stroke: isSelected
                         ? measureLineSelected
+                        : isHovered
+                          ? 'rgba(46,111,115,0.66)'
                         : isMeasured
                           ? measureLineMeasured
                           : measureLineIdle,
-                      strokeWidth: isSelected ? 2.7 : isMeasured ? 2.3 : 2.05,
+                      strokeWidth: isSelected ? 2.7 : isHovered ? 2.45 : isMeasured ? 2.3 : 2.05,
                     }}
                     d={callout.pathD}
                     fill="none"
@@ -386,13 +445,15 @@ export function TechnicalMeasurementPlate({
                   ) : null}
                   <motion.path
                     animate={{
-                      opacity: isSelected ? 0.94 : isMeasured ? 0.8 : 0.72,
+                      opacity: isSelected ? 0.94 : isHovered ? 0.88 : isMeasured ? 0.8 : 0.66,
                       stroke: isSelected
                         ? leaderLineSelected
+                        : isHovered
+                          ? 'rgba(46,111,115,0.58)'
                         : isMeasured
                           ? leaderLineMeasured
                           : leaderLineIdle,
-                      strokeWidth: isSelected ? 2 : 1.55,
+                      strokeWidth: isSelected ? 2 : isHovered ? 1.8 : 1.55,
                     }}
                     d={leaderPath}
                     fill="none"
@@ -493,12 +554,16 @@ export function TechnicalMeasurementPlate({
                           animate={{
                             fill: isSelected
                               ? ink
+                              : isHovered
+                                ? 'rgba(246,250,248,0.98)'
                               : isMeasured
                                 ? 'rgba(245,233,201,0.95)'
                                 : 'rgba(255,255,255,0.84)',
                             opacity: isSelected ? 1 : 0.96,
                             stroke: isSelected
                               ? 'rgba(215,232,230,0.82)'
+                              : isHovered
+                                ? 'rgba(46,111,115,0.24)'
                               : isMeasured
                                 ? 'rgba(139,107,40,0.18)'
                                 : 'rgba(32,56,74,0.09)',
