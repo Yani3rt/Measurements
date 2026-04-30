@@ -26,17 +26,22 @@ import {
   signOutFromSupabase,
 } from './supabase';
 import {
+  clearAllAtelierLocalCache,
   createProfile as createStoredProfile,
   deleteProfile as deleteStoredProfile,
+  loadCachedProfiles,
   loadMeasurementHistory,
   loadProfileHeightHistory,
   loadProfileTimeline,
   loadProfiles,
+  removeProfileFromCacheList,
+  replaceProfileInCacheList,
   saveMeasurement as saveStoredMeasurement,
   updateProfile as updateStoredProfile,
   type MeasurementHistoryResponse,
   type ProfileHeightHistoryResponse,
   type ProfileTimelineResponse,
+  writeProfileCache,
 } from './storage';
 import {FittingTimeline} from './FittingTimeline';
 import {TechnicalMeasurementPlate} from './technicalPlate';
@@ -175,8 +180,10 @@ export default function App() {
   );
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthPending, setIsAuthPending] = useState(false);
+  const [authenticatedUserId, setAuthenticatedUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [apiStatus, setApiStatus] = useState<ApiStatus>('loading');
+  const [isRevalidatingProfiles, setIsRevalidatingProfiles] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<MeasurementView>('front');
@@ -209,9 +216,14 @@ export default function App() {
   const [profileTimeline, setProfileTimeline] =
     useState<ProfileTimelineResponse | null>(null);
   const hasLoadedProfilesRef = useRef(false);
+  const authenticatedUserIdRef = useRef<string | null>(null);
+  const previousAuthenticatedUserIdRef = useRef<string | null>(null);
+  const profileSessionKeyRef = useRef<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
 
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) ?? null;
+  const shouldShowWorkspaceSkeleton = apiStatus === 'loading' && !isRevalidatingProfiles;
+  const shouldShowRevalidationNotice = apiStatus === 'loading' && isRevalidatingProfiles;
   const shouldHighlightAddProfile =
     apiStatus === 'ready' && profiles.length === 0 && !prefersReducedMotion;
   const currentMeasurement =
@@ -269,6 +281,61 @@ export default function App() {
         : null;
   const canSaveMeasurement = !measurementError;
 
+  function createProfileSessionKey(userId: string) {
+    const randomSegment =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    return `${userId}:${randomSegment}`;
+  }
+
+  function cacheConfirmedProfiles(nextProfiles: Profile[]) {
+    const userId = authenticatedUserIdRef.current;
+    const sessionKey = profileSessionKeyRef.current;
+
+    if (userId && sessionKey) {
+      try {
+        writeProfileCache(window.localStorage, userId, sessionKey, nextProfiles);
+      } catch {
+        // Cache writes are best effort. Ignore unavailable localStorage access.
+      }
+    }
+  }
+
+  function replaceProfilesFromServer(nextProfiles: Profile[]) {
+    setProfiles(nextProfiles);
+    cacheConfirmedProfiles(nextProfiles);
+  }
+
+  function updateProfilesFromServer(updater: (currentProfiles: Profile[]) => Profile[]) {
+    setProfiles((currentProfiles) => {
+      const nextProfiles = updater(currentProfiles);
+      cacheConfirmedProfiles(nextProfiles);
+      return nextProfiles;
+    });
+  }
+
+  function observeAuthenticatedUser(userId: string) {
+    const previousUserId = previousAuthenticatedUserIdRef.current;
+
+    if (previousUserId !== userId) {
+      clearAllAtelierLocalCache();
+      profileSessionKeyRef.current = createProfileSessionKey(userId);
+      hasLoadedProfilesRef.current = false;
+    }
+
+    previousAuthenticatedUserIdRef.current = userId;
+    authenticatedUserIdRef.current = userId;
+    setAuthenticatedUserId(userId);
+  }
+
+  function clearAuthenticatedUserContext() {
+    authenticatedUserIdRef.current = null;
+    setAuthenticatedUserId(null);
+    profileSessionKeyRef.current = null;
+  }
+
   useEffect(() => {
     if (!isSupabaseAuthConfigured) {
       setAuthStatus('config_error');
@@ -293,8 +360,11 @@ export default function App() {
           throw error;
         }
 
-        if (session) {
+        if (session?.user?.id) {
+          observeAuthenticatedUser(session.user.id);
           setApiStatus('loading');
+        } else {
+          clearAuthenticatedUserContext();
         }
         setAuthStatus(session ? 'signed_in' : 'signed_out');
       } catch (error) {
@@ -311,14 +381,21 @@ export default function App() {
 
     const {
       data: {subscription},
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || (session?.user?.id && previousAuthenticatedUserIdRef.current !== session.user.id)) {
+        clearAllAtelierLocalCache();
+        previousAuthenticatedUserIdRef.current = null;
+      }
+
+      if (session?.user?.id) {
+        observeAuthenticatedUser(session.user.id);
         setApiStatus('loading');
-      }
-      setAuthStatus(session ? 'signed_in' : 'signed_out');
-      if (session) {
         setAuthError(null);
+      } else {
+        clearAuthenticatedUserContext();
       }
+
+      setAuthStatus(session ? 'signed_in' : 'signed_out');
       setIsAuthPending(false);
     });
 
@@ -357,12 +434,15 @@ export default function App() {
     setProfileTimeline(null);
     setIsTimelineOpen(false);
     setServiceError(null);
+    setIsRevalidatingProfiles(false);
     setApiStatus('ready');
     hasLoadedProfilesRef.current = false;
+    clearAllAtelierLocalCache();
+    clearAuthenticatedUserContext();
   }, [authStatus]);
 
   useEffect(() => {
-    if (authStatus !== 'signed_in') {
+    if (authStatus !== 'signed_in' || !authenticatedUserId) {
       return;
     }
 
@@ -370,7 +450,29 @@ export default function App() {
 
     async function hydrateProfiles() {
       setApiStatus('loading');
+      setIsRevalidatingProfiles(false);
       setServiceError(null);
+
+      const sessionKey = profileSessionKeyRef.current;
+      if (sessionKey) {
+        const cachedProfiles = await loadCachedProfiles(sessionKey);
+
+        if (cancelled) {
+          return;
+        }
+
+        if (cachedProfiles) {
+          setIsRevalidatingProfiles(true);
+          setProfiles(cachedProfiles);
+          setSelectedProfileId((current) => {
+            if (current && cachedProfiles.some((profile) => profile.id === current)) {
+              return current;
+            }
+
+            return cachedProfiles[0]?.id ?? null;
+          });
+        }
+      }
 
       try {
         const nextProfiles = await loadProfiles();
@@ -379,7 +481,8 @@ export default function App() {
           return;
         }
 
-        setProfiles(nextProfiles);
+        replaceProfilesFromServer(nextProfiles);
+        setIsRevalidatingProfiles(false);
         setApiStatus('ready');
         setActionError(null);
         setSelectedProfileId((current) => {
@@ -405,6 +508,7 @@ export default function App() {
         setSelectedMeasurement(null);
         setIsEditingMeasurement(false);
         setIsQuickAddOpen(false);
+        setIsRevalidatingProfiles(false);
         setApiStatus('offline');
         setServiceError(
           getErrorMessage(error, 'Unable to reach Supabase right now.'),
@@ -417,7 +521,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [authStatus]);
+  }, [authStatus, authenticatedUserId]);
 
   useEffect(() => {
     if (!selectedProfile) {
@@ -469,6 +573,8 @@ export default function App() {
 
     try {
       await signOutFromSupabase();
+      clearAllAtelierLocalCache();
+      clearAuthenticatedUserContext();
     } catch (error) {
       setAuthError(getErrorMessage(error, 'Unable to sign out right now.'));
       setIsAuthPending(false);
@@ -513,7 +619,9 @@ export default function App() {
       if (profileModalMode === 'create' || !editingProfileId) {
         const nextProfile = await createStoredProfile(payload);
 
-        setProfiles((current) => [nextProfile, ...current]);
+        updateProfilesFromServer((currentProfiles) =>
+          replaceProfileInCacheList(currentProfiles, nextProfile, {insert: 'prepend'}),
+        );
         setSelectedProfileId(nextProfile.id);
         setCurrentView('front');
         setSelectedMeasurement(null);
@@ -521,10 +629,8 @@ export default function App() {
       } else {
         const updatedProfile = await updateStoredProfile(editingProfileId, payload);
 
-        setProfiles((current) =>
-          current.map((profile) =>
-            profile.id === editingProfileId ? updatedProfile : profile,
-          ),
+        updateProfilesFromServer((currentProfiles) =>
+          replaceProfileInCacheList(currentProfiles, updatedProfile),
         );
       }
 
@@ -560,14 +666,24 @@ export default function App() {
     try {
       await deleteStoredProfile(profileId);
 
-      const remainingProfiles = profiles.filter((entry) => entry.id !== profileId);
-      setProfiles(remainingProfiles);
+      updateProfilesFromServer((currentProfiles) => {
+        const remainingProfiles = removeProfileFromCacheList(currentProfiles, profileId);
 
-      if (selectedProfileId === profileId) {
-        setSelectedProfileId(remainingProfiles[0]?.id ?? null);
-        setSelectedMeasurement(null);
-        setIsEditingMeasurement(false);
-      }
+        setSelectedProfileId((currentSelectedProfileId) => {
+          if (
+            currentSelectedProfileId &&
+            remainingProfiles.some((remainingProfile) => remainingProfile.id === currentSelectedProfileId)
+          ) {
+            return currentSelectedProfileId;
+          }
+
+          setSelectedMeasurement(null);
+          setIsEditingMeasurement(false);
+          return remainingProfiles[0]?.id ?? null;
+        });
+
+        return remainingProfiles;
+      });
 
       if (editingProfileId === profileId) {
         setIsQuickAddOpen(false);
@@ -704,10 +820,8 @@ export default function App() {
         valueCm,
       );
 
-      setProfiles((current) =>
-        current.map((profile) =>
-          profile.id === selectedProfile.id ? updatedProfile : profile,
-        ),
+      updateProfilesFromServer((currentProfiles) =>
+        replaceProfileInCacheList(currentProfiles, updatedProfile),
       );
       setIsEditingMeasurement(false);
     } catch (error) {
@@ -992,7 +1106,9 @@ export default function App() {
 
       <main className="relative mx-auto max-w-[96rem] px-4 pb-6 pt-3 xl:px-8 xl:py-8">
         <section className="min-h-[42rem] rounded-[2.4rem] bg-surface/92 p-5 shadow-[0_12px_32px_-4px_rgba(26,28,25,0.06)] ring-1 ring-outline-variant/12 xl:p-7">
-          {apiStatus === 'loading' ? (
+          {shouldShowRevalidationNotice ? <RevalidatingProfilesNotice /> : null}
+
+          {shouldShowWorkspaceSkeleton ? (
             <SubtleWorkspaceSkeleton />
           ) : apiStatus === 'offline' ? (
             <IllustratedStatePanel
@@ -1177,6 +1293,27 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+
+function RevalidatingProfilesNotice() {
+  return (
+    <div
+      aria-live="polite"
+      className="mb-5 flex flex-col gap-3 rounded-[1.6rem] bg-secondary-container/28 px-4 py-3 text-secondary ring-1 ring-secondary/18 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div>
+        <p className="type-overline">Confirming with Supabase</p>
+        <p className="type-note mt-1 text-secondary/82">
+          Showing same-session cached profiles while Supabase confirms the current measurements.
+        </p>
+      </div>
+      <div className="type-button inline-flex items-center gap-2 rounded-full bg-white/60 px-3 py-2">
+        <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
+        Revalidating
+      </div>
     </div>
   );
 }

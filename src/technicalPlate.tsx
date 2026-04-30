@@ -1,3 +1,4 @@
+import type {TouchEvent} from 'react';
 import {useEffect, useRef, useState} from 'react';
 import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
 import {ArrowRightLeft, Maximize2, Minimize2, RotateCcw, User} from 'lucide-react';
@@ -140,6 +141,7 @@ export function TechnicalMeasurementPlate({
   const activeCallout = callouts.find((callout) => callout.key === selectedMeasurement) ?? null;
   const prefersReducedMotion = useReducedMotion();
   const hasPlayedInitialFrontIntroRef = useRef(false);
+  const touchStartRef = useRef<{x: number; y: number} | null>(null);
   const [frontIntroCycle, setFrontIntroCycle] = useState(0);
   const [hoveredMeasurement, setHoveredMeasurement] = useState<MeasurementKey | null>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
@@ -191,12 +193,49 @@ export function TechnicalMeasurementPlate({
     return () => mediaQuery.removeEventListener('change', syncViewport);
   }, []);
 
+  const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    touchStartRef.current = {x: touch.clientX, y: touch.clientY};
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    if (!touchStartRef.current) {
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+    touchStartRef.current = null;
+
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+    const swipeThreshold = 44;
+
+    if (absX < swipeThreshold || absX < absY * 1.2) {
+      return;
+    }
+
+    if (deltaX < 0 && currentView !== 'back') {
+      onSetCurrentView('back');
+      return;
+    }
+
+    if (deltaX > 0 && currentView !== 'front') {
+      onSetCurrentView('front');
+    }
+  };
+
   return (
-    <div className={`relative overflow-hidden border border-primary/8 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] sm:p-4 ${
+    <div
+      className={`relative overflow-hidden border border-primary/8 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] sm:p-4 ${
       isFullscreen
         ? 'h-full rounded-none bg-[linear-gradient(180deg,var(--color-background)_0%,rgba(248,246,239,0.96)_18%,rgba(248,246,239,0.96)_82%,var(--color-background)_100%)]'
         : 'rounded-[2.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(248,246,239,0.95))]'
-    }`}>
+    }`}
+      onTouchEnd={handleTouchEnd}
+      onTouchStart={handleTouchStart}
+    >
       <div className="absolute left-4 top-4 z-20 sm:left-6 sm:top-5">
         <div className="inline-flex rounded-full bg-white/92 p-1 shadow-[0_14px_32px_-24px_rgba(3,25,46,0.38)] ring-1 ring-outline-variant/10 backdrop-blur-sm">
           {([

@@ -1,5 +1,4 @@
 import {createEmptyMeasurements, measurementDefinitionsByKey} from './measurements';
-import {getSupabaseBrowserClient, isSupabaseAuthConfigured} from './supabase';
 import type {MeasurementKey, Measurements, Profile, Sex} from './types';
 
 type ProfilePayload = {
@@ -7,6 +6,20 @@ type ProfilePayload = {
   name: string;
   sex: Sex;
 };
+
+export type ProfileCachePayload = {
+  cachedAt: string;
+  sessionKey: string;
+  userId: string;
+  profiles: Profile[];
+};
+
+type ProfileCacheStorage = Pick<Storage, 'getItem' | 'key' | 'length' | 'removeItem' | 'setItem'>;
+
+type SupabaseClient = ReturnType<(typeof import('./supabase'))['getSupabaseBrowserClient']>;
+
+export const PROFILE_CACHE_VERSION = 1;
+export const PROFILE_CACHE_PREFIX = `the-atelier:v${PROFILE_CACHE_VERSION}:profiles`;
 
 type TimestampValue = string | Date;
 
@@ -78,6 +91,231 @@ export type ProfileTimelineResponse = {
 const SERVICE_UNAVAILABLE_MESSAGE =
   'Supabase is unavailable right now. Check your connection and try again.';
 
+function getProfileCacheUserPrefix(userId: string) {
+  return `${PROFILE_CACHE_PREFIX}:${encodeURIComponent(userId)}:`;
+}
+
+function getLegacyProfileCacheKey(userId: string) {
+  return `${PROFILE_CACHE_PREFIX}:${userId}`;
+}
+
+export function getProfileCacheKey(userId: string, sessionKey: string) {
+  return `${getProfileCacheUserPrefix(userId)}${encodeURIComponent(sessionKey)}`;
+}
+
+export function serializeProfileCachePayload(payload: ProfileCachePayload) {
+  return JSON.stringify(payload);
+}
+
+function isProfile(value: unknown): value is Profile {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<Profile>;
+
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.name === 'string' &&
+    (candidate.sex === 'female' || candidate.sex === 'male') &&
+    typeof candidate.heightCm === 'number' &&
+    typeof candidate.createdAt === 'string' &&
+    typeof candidate.updatedAt === 'string' &&
+    !!candidate.measurements &&
+    typeof candidate.measurements === 'object'
+  );
+}
+
+export function validateProfileCachePayload(
+  payload: unknown,
+  userId: string,
+  sessionKey: string,
+): ProfileCachePayload | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const candidate = payload as Partial<ProfileCachePayload>;
+
+  if (
+    candidate.userId !== userId ||
+    candidate.sessionKey !== sessionKey ||
+    typeof candidate.cachedAt !== 'string' ||
+    !Array.isArray(candidate.profiles) ||
+    !candidate.profiles.every(isProfile)
+  ) {
+    return null;
+  }
+
+  return candidate as ProfileCachePayload;
+}
+
+function safeGetItem(storage: ProfileCacheStorage, key: string) {
+  try {
+    return storage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSetItem(storage: ProfileCacheStorage, key: string, value: string) {
+  try {
+    storage.setItem(key, value);
+  } catch {
+    // Cache writes are best effort. Ignore quota, privacy, or unavailable-storage failures.
+  }
+}
+
+function safeRemoveItem(storage: ProfileCacheStorage, key: string) {
+  try {
+    storage.removeItem(key);
+  } catch {
+    // Cache cleanup is best effort. Ignore unavailable-storage failures.
+  }
+}
+
+function safeCollectStorageKeys(storage: ProfileCacheStorage) {
+  try {
+    const keys: string[] = [];
+
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+
+      if (key) {
+        keys.push(key);
+      }
+    }
+
+    return keys;
+  } catch {
+    return [];
+  }
+}
+
+export function readProfileCache(
+  storage: ProfileCacheStorage,
+  userId: string,
+  sessionKey: string,
+) {
+  const cacheKey = getProfileCacheKey(userId, sessionKey);
+  const serialized = safeGetItem(storage, cacheKey);
+
+  if (!serialized) {
+    return null;
+  }
+
+  try {
+    const payload = validateProfileCachePayload(JSON.parse(serialized), userId, sessionKey);
+
+    if (!payload) {
+      safeRemoveItem(storage, cacheKey);
+      return null;
+    }
+
+    return payload?.profiles ?? null;
+  } catch {
+    safeRemoveItem(storage, cacheKey);
+    return null;
+  }
+}
+
+export function writeProfileCache(
+  storage: ProfileCacheStorage,
+  userId: string,
+  sessionKey: string,
+  profiles: Profile[],
+  cachedAt = new Date().toISOString(),
+) {
+  safeSetItem(
+    storage,
+    getProfileCacheKey(userId, sessionKey),
+    serializeProfileCachePayload({
+      cachedAt,
+      profiles,
+      sessionKey,
+      userId,
+    }),
+  );
+}
+
+export function replaceProfileInCacheList(
+  profiles: Profile[],
+  serverProfile: Profile,
+  options: {insert?: 'append' | 'prepend'} = {},
+) {
+  const existingIndex = profiles.findIndex((profile) => profile.id === serverProfile.id);
+
+  if (existingIndex !== -1) {
+    return profiles.map((profile) =>
+      profile.id === serverProfile.id ? serverProfile : profile,
+    );
+  }
+
+  return options.insert === 'append'
+    ? [...profiles, serverProfile]
+    : [serverProfile, ...profiles];
+}
+
+export function removeProfileFromCacheList(profiles: Profile[], profileId: string) {
+  return profiles.filter((profile) => profile.id !== profileId);
+}
+
+export async function loadCachedProfiles(sessionKey: string) {
+  const storage = getBrowserLocalStorage();
+
+  if (!storage) {
+    return null;
+  }
+
+  try {
+    const {userId} = await getAuthenticatedSupabaseContext();
+    return readProfileCache(storage, userId, sessionKey);
+  } catch {
+    return null;
+  }
+}
+
+function getBrowserLocalStorage() {
+  try {
+    return typeof window === 'undefined' ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function clearProfileCacheForUser(
+  userId: string,
+  storage: ProfileCacheStorage | null = getBrowserLocalStorage(),
+) {
+  if (!storage) {
+    return;
+  }
+
+  const userCachePrefix = getProfileCacheUserPrefix(userId);
+  const legacyUserCacheKey = getLegacyProfileCacheKey(userId);
+  const keysToRemove = safeCollectStorageKeys(storage).filter(
+    (key) => key.startsWith(userCachePrefix) || key === legacyUserCacheKey,
+  );
+
+  for (const key of keysToRemove) {
+    safeRemoveItem(storage, key);
+  }
+}
+
+export function clearAllAtelierLocalCache(
+  storage: ProfileCacheStorage | null = getBrowserLocalStorage(),
+) {
+  if (!storage) {
+    return;
+  }
+
+  const keysToRemove = safeCollectStorageKeys(storage).filter((key) => key.startsWith('the-atelier:'));
+
+  for (const key of keysToRemove) {
+    safeRemoveItem(storage, key);
+  }
+}
+
 function toIsoString(value: TimestampValue) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
@@ -135,7 +373,13 @@ function normalizeSupabaseError(error: unknown) {
   return new Error(SERVICE_UNAVAILABLE_MESSAGE);
 }
 
+async function loadSupabaseModule() {
+  return import('./supabase');
+}
+
 async function getAuthenticatedSupabaseContext() {
+  const {getSupabaseBrowserClient, isSupabaseAuthConfigured} = await loadSupabaseModule();
+
   if (!isSupabaseAuthConfigured) {
     throw new Error(
       'Supabase Auth is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
@@ -163,7 +407,7 @@ async function getAuthenticatedSupabaseContext() {
 }
 
 async function loadMeasurements(
-  supabase: ReturnType<typeof getSupabaseBrowserClient>,
+  supabase: SupabaseClient,
   profileIds: string[],
 ) {
   if (profileIds.length === 0) {
@@ -183,7 +427,7 @@ async function loadMeasurements(
 }
 
 async function loadProfileById(
-  supabase: ReturnType<typeof getSupabaseBrowserClient>,
+  supabase: SupabaseClient,
   profileId: string,
 ) {
   const {data, error} = await supabase
