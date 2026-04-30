@@ -1,14 +1,6 @@
 import {measurementDefinitions} from './measurements';
 import type {MeasurementKey, Profile, Unit} from './types';
 
-export function createProfileId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  return `profile-${Math.random().toString(36).slice(2, 10)}`;
-}
-
 export function cmToInches(valueCm: number) {
   return valueCm / 2.54;
 }

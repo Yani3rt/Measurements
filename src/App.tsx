@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Clock3,
   History,
+  LoaderCircle,
   LogOut,
   PencilLine,
   Plus,
@@ -14,7 +15,6 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import type {AuthSession, AuthUser} from '@supabase/supabase-js';
 import {
   measurementDefinitions,
   measurementDefinitionsByKey,
@@ -169,8 +169,6 @@ export default function App() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>(
     isSupabaseAuthConfigured ? 'loading' : 'config_error',
   );
-  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthPending, setIsAuthPending] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -266,16 +264,15 @@ export default function App() {
           throw error;
         }
 
-        setAuthSession(session);
-        setAuthUser(session?.user ?? null);
+        if (session) {
+          setApiStatus('loading');
+        }
         setAuthStatus(session ? 'signed_in' : 'signed_out');
       } catch (error) {
         if (cancelled) {
           return;
         }
 
-        setAuthSession(null);
-        setAuthUser(null);
         setAuthStatus('signed_out');
         setAuthError(getErrorMessage(error, 'Unable to restore your session.'));
       }
@@ -286,8 +283,9 @@ export default function App() {
     const {
       data: {subscription},
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthSession(session);
-      setAuthUser(session?.user ?? null);
+      if (session) {
+        setApiStatus('loading');
+      }
       setAuthStatus(session ? 'signed_in' : 'signed_out');
       if (session) {
         setAuthError(null);
@@ -613,6 +611,21 @@ export default function App() {
     setIsEditingMeasurement(true);
   }
 
+  function handleToggleUnit() {
+    setUnit((current) => {
+      const nextUnit = current === 'cm' ? 'in' : 'cm';
+      const parsedValue = Number(editValue);
+
+      if (isEditingMeasurement && editValue.trim() !== '' && Number.isFinite(parsedValue)) {
+        const valueCm = normalizeMeasurementInput(parsedValue, current);
+        const nextValue = nextUnit === 'cm' ? valueCm : valueCm / 2.54;
+        setEditValue(stripTrailingZeroes(nextValue));
+      }
+
+      return nextUnit;
+    });
+  }
+
   async function handleSaveMeasurement() {
     if (!selectedProfile || !selectedMeasurement || isSavingMeasurement) {
       return;
@@ -649,20 +662,6 @@ export default function App() {
     }
   }
 
-  if (authStatus === 'loading') {
-    return (
-      <AuthStateScreen
-        body="Restoring your secure workspace and laying out the fitting room for your household profiles."
-        eyebrow="Private fitting room"
-        illustrationAlt="The Atelier mascot preparing to guide the fitting workspace."
-        illustrationSrc={mascotGuideImage}
-        noteBody="Once you're in, profiles keep each family member’s measurements organized separately."
-        noteTitle="Atelier note"
-        title="Preparing your atelier"
-      />
-    );
-  }
-
   if (authStatus === 'config_error') {
     return (
       <AuthStateScreen
@@ -677,12 +676,16 @@ export default function App() {
     );
   }
 
-  if (authStatus === 'signed_out') {
+  if (authStatus === 'signed_out' || authStatus === 'loading') {
+    const isAuthLoadingScreen = authStatus === 'loading';
+    const isLoginActionDisabled = isAuthPending || isAuthLoadingScreen;
+    const shouldAnimateLoginCta = !isLoginActionDisabled && !prefersReducedMotion;
+
     return (
       <AuthStateScreen
         action={
           <div className="relative inline-flex">
-            {!isAuthPending && !prefersReducedMotion ? (
+            {shouldAnimateLoginCta ? (
               <>
                 <motion.span
                   aria-hidden="true"
@@ -730,19 +733,19 @@ export default function App() {
             <motion.button
               animate={{
                 boxShadow:
-                  !isAuthPending && !prefersReducedMotion
+                  shouldAnimateLoginCta
                     ? '0 18px 34px -18px rgba(3,25,46,0.84)'
                     : '0 18px 32px -22px rgba(3,25,46,0.8)',
               }}
               className="type-button relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] px-5 py-3 text-white shadow-[0_18px_32px_-22px_rgba(3,25,46,0.8)] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isAuthPending}
+              disabled={isLoginActionDisabled}
               onClick={() => void handleSignIn()}
               transition={{duration: 0.3, ease: calmEase}}
               type="button"
             >
               <motion.span
                 animate={
-                  !isAuthPending && !prefersReducedMotion
+                  shouldAnimateLoginCta
                     ? {
                         rotate: [0, 0, 10, 0],
                         scale: [1, 1, 1.08, 1],
@@ -752,38 +755,42 @@ export default function App() {
                 }
                 className="inline-flex h-5 w-5 items-center justify-center"
                 transition={
-                  !isAuthPending && !prefersReducedMotion
+                  shouldAnimateLoginCta
                     ? {
-                      duration: 2.4,
-                      ease: calmEase,
+                        duration: 2.4,
+                        ease: calmEase,
                         repeat: Infinity,
                         repeatDelay: 0.9,
                       }
                     : {duration: 0.2}
                 }
               >
-                <svg
-                  aria-hidden="true"
-                  className="h-4 w-4"
-                  viewBox="0 0 18 18"
-                >
-                  <path
-                    d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.56 2.68-3.86 2.68-6.62Z"
-                    fill="#4285F4"
-                  />
-                  <path
-                    d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.85.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z"
-                    fill="#34A853"
-                  />
-                  <path
-                    d="M3.97 10.72A5.41 5.41 0 0 1 3.69 9c0-.6.1-1.18.28-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33Z"
-                    fill="#FBBC05"
-                  />
-                  <path
-                    d="M9 3.58c1.32 0 2.5.45 3.43 1.33l2.58-2.58C13.46.89 11.42 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z"
-                    fill="#EA4335"
-                  />
-                </svg>
+                {isLoginActionDisabled ? (
+                  <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
+                ) : (
+                  <svg
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                    viewBox="0 0 18 18"
+                  >
+                    <path
+                      d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.56 2.68-3.86 2.68-6.62Z"
+                      fill="#4285F4"
+                    />
+                    <path
+                      d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.85.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z"
+                      fill="#34A853"
+                    />
+                    <path
+                      d="M3.97 10.72A5.41 5.41 0 0 1 3.69 9c0-.6.1-1.18.28-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33Z"
+                      fill="#FBBC05"
+                    />
+                    <path
+                      d="M9 3.58c1.32 0 2.5.45 3.43 1.33l2.58-2.58C13.46.89 11.42 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z"
+                      fill="#EA4335"
+                    />
+                  </svg>
+                )}
               </motion.span>
               <span>{isAuthPending ? 'Redirecting to Google…' : 'Continue with Google'}</span>
             </motion.button>
@@ -977,7 +984,7 @@ export default function App() {
                   onSelectMeasurement={handleSelectMeasurement}
                   onSetCurrentView={setCurrentView}
                   onStartEditing={handleStartEditing}
-                  onToggleUnit={() => setUnit((current) => (current === 'cm' ? 'in' : 'cm'))}
+                  onToggleUnit={handleToggleUnit}
                   profile={selectedProfile}
                   selectedMeasurement={selectedMeasurement}
                   unit={unit}
@@ -1061,6 +1068,7 @@ export default function App() {
             onSaveMeasurement={() => {
               void handleSaveMeasurement();
             }}
+            onToggleUnit={handleToggleUnit}
             saveError={measurementSubmitError}
             unit={unit}
           />
@@ -1342,44 +1350,6 @@ function IllustratedStatePanel({
   );
 }
 
-function AtelierTipCard({
-  accent,
-  body,
-  imageAlt,
-  imageSrc,
-  title,
-}: {
-  accent: string;
-  body: string;
-  imageAlt: string;
-  imageSrc: string;
-  title: string;
-}) {
-  return (
-    <div className="overflow-hidden rounded-[2.2rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(244,244,239,0.86))] ring-1 ring-outline-variant/12 shadow-[0_16px_34px_-30px_rgba(3,25,46,0.3)]">
-      <div className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_13rem] md:items-center md:p-6">
-        <div>
-          <p className="type-overline text-secondary">Atelier note</p>
-          <h3 className="type-ui mt-3 text-primary">{title}</h3>
-          <p className="type-note mt-2 text-on-surface-variant">{body}</p>
-          <div className="type-button mt-4 inline-flex rounded-full bg-secondary-container/44 px-4 py-2 text-secondary">
-            {accent}
-          </div>
-        </div>
-
-        <div className="relative mx-auto w-full max-w-[10rem] md:max-w-[11.5rem]">
-          <div className="pointer-events-none absolute inset-x-6 bottom-2 h-6 rounded-full bg-secondary-container/30 blur-2xl" />
-          <img
-            alt={imageAlt}
-            className="relative mx-auto w-full"
-            src={imageSrc}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ProfileSwitcher({
   deletingProfileId,
   onCreateProfile,
@@ -1464,65 +1434,39 @@ function ProfileSwitcher({
       <AnimatePresence>
         {isOpen && profiles.length > 0 ? (
           <motion.div
-            animate="visible"
+            animate={{opacity: 1, y: 0, scale: 1}}
             className="absolute right-0 z-40 mt-3 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[1.8rem] bg-background/98 p-3 shadow-[0_24px_60px_-32px_rgba(3,25,46,0.34)] ring-1 ring-outline-variant/12 backdrop-blur-md"
-            exit="exit"
-            initial="hidden"
-            variants={
+            exit={{opacity: 0, y: -4, scale: 0.995}}
+            initial={{opacity: 0, y: -4, scale: 0.995}}
+            transition={
               prefersReducedMotion
-                ? {
-                    hidden: {opacity: 0},
-                    visible: {opacity: 1, transition: {duration: 0.01}},
-                    exit: {opacity: 0, transition: {duration: 0.01}},
-                  }
-                : {
-                    hidden: {opacity: 0, y: -8, scale: 0.985},
-                    visible: {
-                      opacity: 1,
-                      y: 0,
-                      scale: 1,
-                      transition: {
-                        duration: 0.24,
-                        ease: elegantEase,
-                        when: 'beforeChildren',
-                        staggerChildren: 0.04,
-                      },
-                    },
-                    exit: {
-                      opacity: 0,
-                      y: -6,
-                      scale: 0.99,
-                      transition: {duration: 0.16, ease: decisiveEase},
-                    },
-                  }
+                ? {duration: 0.01}
+                : {duration: 0.12, ease: decisiveEase}
             }
           >
-            <motion.div className="px-3 pb-3 pt-1" variants={fadeUpVariants}>
+            <div className="px-3 pb-3 pt-1">
               <p className="type-overline text-on-surface-variant">
                 Household archive
               </p>
               <p className="type-note mt-1 text-primary/72">
                 Choose the fitting card to open.
               </p>
-            </motion.div>
+            </div>
             <div className="space-y-2">
-              {profiles.map((profile, index) => {
+              {profiles.map((profile) => {
                 const isActive = selectedProfileId === profile.id;
                 const filled = measurementDefinitions.filter(
                   (definition) => profile.measurements[definition.key] > 0,
                 ).length;
 
                 return (
-                  <motion.div
+                  <div
                     className={`relative overflow-hidden rounded-[1.35rem] p-3 transition-all ${
                       isActive
                         ? 'bg-primary text-white shadow-[0_18px_34px_-25px_rgba(3,25,46,0.74)]'
                         : 'bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(244,244,239,0.72))] text-primary hover:bg-white ring-1 ring-outline-variant/8'
                     }`}
                     key={profile.id}
-                    layout
-                    variants={fadeUpVariants}
-                    custom={index + 1}
                   >
                     <div className="pointer-events-none absolute right-3 top-3 h-12 w-12 rounded-full border border-current/10" />
                     <button
@@ -1597,11 +1541,11 @@ function ProfileSwitcher({
                         <Trash2 size={14} />
                       </button>
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
-            <motion.div className="mt-3 border-t border-outline-variant/10 pt-3" variants={fadeUpVariants}>
+            <div className="mt-3 border-t border-outline-variant/10 pt-3">
               <button
                 className="type-button inline-flex w-full items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] px-4 py-3 text-white shadow-[0_16px_30px_-22px_rgba(3,25,46,0.75)] transition-transform active:scale-[0.98]"
                 onClick={() => {
@@ -1613,7 +1557,7 @@ function ProfileSwitcher({
                 <Plus size={15} />
                 Add profile
               </button>
-            </motion.div>
+            </div>
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -2212,6 +2156,7 @@ function MeasurementEditModal({
   onChangeEditValue,
   onClose,
   onSaveMeasurement,
+  onToggleUnit,
   saveError,
   unit,
 }: {
@@ -2223,9 +2168,13 @@ function MeasurementEditModal({
   onChangeEditValue: (value: string) => void;
   onClose: () => void;
   onSaveMeasurement: () => void;
+  onToggleUnit: () => void;
   saveError: string | null;
   unit: Unit;
 }) {
+  const prefersReducedMotion = useReducedMotion();
+  const alternateUnit = unit === 'cm' ? 'in' : 'cm';
+
   return (
     <motion.div
       animate={{opacity: 1}}
@@ -2246,9 +2195,6 @@ function MeasurementEditModal({
                 Measurement edit
               </p>
               <h2 className="type-section-title text-primary">{currentMeasurement.label}</h2>
-              <p className="type-note mt-2 hidden max-w-lg text-on-surface-variant md:block">
-                Enter the updated value in {unit}. The diagram will keep the canonical record in centimeters behind the scenes.
-              </p>
             </div>
             <button
               className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-primary"
@@ -2269,23 +2215,67 @@ function MeasurementEditModal({
           </div>
 
           <div className="mt-5 md:mt-6">
-            <label
-              className="type-overline block text-on-surface-variant"
-              htmlFor="measurement-value"
-            >
-              Value in {unit}
-            </label>
-            <input
-              className="type-metric-sm mt-3 w-full rounded-[1.25rem] bg-surface-container-low px-4 py-4 text-primary outline-none ring-1 ring-transparent transition focus:ring-guidance/35"
-              id="measurement-value"
-              inputMode="decimal"
-              max={getMeasurementMax(unit)}
-              min={0}
-              onChange={(event) => onChangeEditValue(sanitizeDecimalInput(event.target.value))}
-              placeholder={`Enter ${currentMeasurement.label.toLowerCase()}`}
-              step="0.1"
-              value={editValue}
-            />
+            <div className="relative overflow-hidden rounded-[1.8rem] bg-[linear-gradient(180deg,rgba(253,220,152,0.26),rgba(255,255,255,0.82))] p-4 ring-1 ring-secondary/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] md:p-5">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-28 opacity-60"
+                style={{
+                  backgroundImage:
+                    'repeating-linear-gradient(90deg, rgba(3,25,46,0.22) 0 1px, transparent 1px 18px), repeating-linear-gradient(90deg, rgba(3,25,46,0.1) 0 1px, transparent 1px 6px)',
+                  backgroundPosition: '0 0, 0 0',
+                  backgroundSize: '90px 42px, 18px 24px',
+                  maskImage: 'linear-gradient(180deg, black, transparent)',
+                }}
+              />
+              <div className="relative flex items-center justify-between gap-3">
+                <label
+                  className="type-overline block text-secondary"
+                  htmlFor="measurement-value"
+                >
+                  Tape measure value
+                </label>
+                <button
+                  aria-label={`Switch units to ${alternateUnit}`}
+                  className="type-button inline-flex items-center gap-2 rounded-full border border-secondary/18 bg-white/72 px-2 py-1 text-secondary shadow-[0_10px_18px_-16px_rgba(115,91,36,0.45)] transition hover:bg-white md:px-3"
+                  onClick={onToggleUnit}
+                  type="button"
+                >
+                  <motion.span
+                    animate={{x: unit === 'cm' ? 0 : 3}}
+                    className="inline-block h-2 w-2 rounded-full bg-secondary"
+                    transition={prefersReducedMotion ? {duration: 0.01} : {duration: 0.2, ease: calmEase}}
+                  />
+                  {unit}
+                </button>
+              </div>
+              <div className="relative mt-4 flex items-end gap-3 rounded-[1.35rem] bg-white/76 px-4 py-4 ring-1 ring-white/68">
+                <input
+                  className="w-full min-w-0 bg-transparent font-headline text-[3.2rem] font-semibold leading-[0.9] tracking-[-0.05em] text-primary outline-none placeholder:text-primary/24 md:text-[4.6rem]"
+                  id="measurement-value"
+                  inputMode="decimal"
+                  max={getMeasurementMax(unit)}
+                  min={0}
+                  onChange={(event) => onChangeEditValue(sanitizeDecimalInput(event.target.value))}
+                  placeholder="0"
+                  step="0.1"
+                  value={editValue}
+                />
+                <motion.span
+                  animate={{opacity: 1, y: 0}}
+                  className="pb-1 font-headline text-2xl font-semibold text-secondary md:pb-2 md:text-3xl"
+                  initial={{opacity: 0, y: 4}}
+                  key={unit}
+                  transition={prefersReducedMotion ? {duration: 0.01} : {duration: 0.22, ease: calmEase}}
+                >
+                  {unit}
+                </motion.span>
+              </div>
+              <div className="relative mt-3 flex justify-between px-1 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-secondary/64">
+                <span>0</span>
+                <span>{Math.round(getMeasurementMax(unit) / 2)}</span>
+                <span>{getMeasurementMax(unit)}</span>
+              </div>
+            </div>
             {measurementError ? (
               <p className="mt-2 text-sm text-secondary">{measurementError}</p>
             ) : null}
