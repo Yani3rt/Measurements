@@ -970,8 +970,8 @@ export default function App() {
         </div>
       </header>
 
-      <main className="relative mx-auto max-w-[96rem] px-4 pb-6 pt-3 md:px-8 md:py-8">
-        <section className="min-h-[42rem] rounded-[2.4rem] bg-surface/92 p-5 shadow-[0_12px_32px_-4px_rgba(26,28,25,0.06)] ring-1 ring-outline-variant/12 md:p-7">
+      <main className="relative mx-auto max-w-[96rem] px-4 pb-6 pt-3 xl:px-8 xl:py-8">
+        <section className="min-h-[42rem] rounded-[2.4rem] bg-surface/92 p-5 shadow-[0_12px_32px_-4px_rgba(26,28,25,0.06)] ring-1 ring-outline-variant/12 xl:p-7">
           {apiStatus === 'loading' ? (
             <SubtleWorkspaceSkeleton />
           ) : apiStatus === 'offline' ? (
@@ -1705,7 +1705,7 @@ function ProfileWorkspace({
     >
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(24rem,0.58fr)] xl:items-start 2xl:grid-cols-[minmax(0,0.88fr)_minmax(27rem,0.6fr)]">
         <motion.div
-          className="-mx-5 -mt-5 relative overflow-hidden rounded-[2.5rem] bg-[linear-gradient(180deg,rgba(244,244,239,0.88),rgba(250,250,245,0.96))] p-0 ring-1 ring-outline-variant/12 md:mx-0 md:mt-0 md:p-6 xl:sticky xl:top-[7.25rem] xl:p-5"
+          className="-mx-5 -mt-7 relative overflow-hidden rounded-[2.5rem] bg-[linear-gradient(180deg,rgba(244,244,239,0.88),rgba(250,250,245,0.96))] p-0 ring-1 ring-outline-variant/12 xl:mx-0 xl:mt-0 xl:sticky xl:top-[7.25rem]"
           variants={fadeUpVariants}
         >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(253,220,152,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(3,25,46,0.06),transparent_28%)]" />
@@ -1778,7 +1778,7 @@ function ProfileWorkspace({
                     animate={
                       shouldAnimateGuidanceToggle ? {opacity: 1, y: 0} : {opacity: 1, y: 0}
                     }
-                    className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between xl:flex-col xl:items-start"
+                    className="hidden flex-col gap-2 md:flex md:flex-row md:items-center md:justify-between lg:hidden"
                     exit={shouldAnimateGuidanceToggle ? {opacity: 0, y: -4} : undefined}
                     initial={shouldAnimateGuidanceToggle ? {opacity: 0, y: 6} : false}
                     key="empty-guidance"

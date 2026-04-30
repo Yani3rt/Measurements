@@ -160,8 +160,8 @@ export function MeasurementRuler({
                 <p className="type-label hidden text-white/60 md:block">
                   {selectedLabel}
                 </p>
-                <p className="type-metric-sm mt-0 text-white md:mt-1">
-                  <span className="md:hidden">{mobileBadgeValue}</span>
+              <p className="type-metric-sm mt-0 text-white md:mt-1">
+                  <span className="text-[22px] leading-[1] md:hidden">{mobileBadgeValue}</span>
                   <span className="hidden md:inline">{badgeValue}</span>
                 </p>
               </motion.div>

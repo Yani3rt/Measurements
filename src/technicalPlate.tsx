@@ -16,6 +16,36 @@ type PlateCallout = {
   uppercase?: boolean;
 };
 
+const mobileFrontCalloutBoxes: Partial<
+  Record<MeasurementKey, {x: number; y: number}>
+> = {
+  shoulderCircumference: {x: 18, y: 132},
+  hatSize: {x: 398, y: 132},
+  bust: {x: 18, y: 224},
+  neck: {x: 398, y: 224},
+  waist: {x: 18, y: 316},
+  underBust: {x: 398, y: 316},
+  rise: {x: 18, y: 408},
+  hips: {x: 398, y: 408},
+  thigh: {x: 18, y: 526},
+  knee: {x: 398, y: 526},
+};
+
+const frontCalloutBoxes: Partial<
+  Record<MeasurementKey, {x: number; y: number}>
+> = {
+  shoulderCircumference: {x: 26, y: 112},
+  hatSize: {x: 421, y: 112},
+  bust: {x: 26, y: 196},
+  neck: {x: 421, y: 196},
+  waist: {x: 26, y: 280},
+  underBust: {x: 421, y: 280},
+  rise: {x: 26, y: 364},
+  hips: {x: 421, y: 364},
+  thigh: {x: 26, y: 460},
+  knee: {x: 421, y: 460},
+};
+
 const ink = '#20384a';
 const inkSoft = '#6b7c8d';
 const measureLineIdle = 'rgba(152, 122, 67, 0.72)';
@@ -106,6 +136,7 @@ export function TechnicalMeasurementPlate({
   const hasPlayedInitialFrontIntroRef = useRef(false);
   const [frontIntroCycle, setFrontIntroCycle] = useState(0);
   const [hoveredMeasurement, setHoveredMeasurement] = useState<MeasurementKey | null>(null);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const shouldRunInitialFrontIntro =
     !prefersReducedMotion &&
     currentView === 'front' &&
@@ -144,6 +175,15 @@ export function TechnicalMeasurementPlate({
       window.clearTimeout(timeoutId);
     };
   }, [currentView, prefersReducedMotion]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 639px)');
+    const syncViewport = () => setIsMobileViewport(mediaQuery.matches);
+
+    syncViewport();
+    mediaQuery.addEventListener('change', syncViewport);
+    return () => mediaQuery.removeEventListener('change', syncViewport);
+  }, []);
 
   return (
     <div className="relative overflow-hidden rounded-[2.35rem] border border-primary/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(248,246,239,0.95))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] sm:p-4">
@@ -361,7 +401,37 @@ export function TechnicalMeasurementPlate({
               const pointEntranceDelay = prefersReducedMotion ? 0 : entranceDelay + 0.14;
               const chipEntranceDelay = prefersReducedMotion ? 0 : entranceDelay + 0.24;
               const chipOffsetX = callout.side === 'left' ? -32 : 32;
-              const leaderPath = buildLeaderPath(callout);
+              const mobileBoxOverride =
+                isMobileViewport && currentView === 'front'
+                  ? mobileFrontCalloutBoxes[callout.key]
+                  : undefined;
+              const desktopBoxOverride =
+                !isMobileViewport && currentView === 'front'
+                  ? frontCalloutBoxes[callout.key]
+                  : undefined;
+              const calloutBox = {
+                ...callout.box,
+                ...desktopBoxOverride,
+                ...mobileBoxOverride,
+              };
+              const calloutWidth = isMobileViewport ? callout.box.width + 46 : callout.box.width;
+              const calloutHeight = isMobileViewport ? 48 : callout.box.height;
+              const calloutDotX = isMobileViewport ? 18 : 14;
+              const calloutTextX = isMobileViewport ? 34 : 26;
+              const calloutLineDy = isMobileViewport ? 18 : 13;
+              const calloutTextY =
+                callout.labelLines.length === 1
+                  ? calloutHeight / 2 + (isMobileViewport ? 6 : 4)
+                  : isMobileViewport
+                    ? 21
+                    : 17;
+              const leaderPath = buildLeaderPath(
+                callout,
+                calloutBox,
+                calloutWidth,
+                calloutHeight,
+                isMobileViewport && currentView === 'front',
+              );
 
               return (
                 <motion.g
@@ -517,7 +587,7 @@ export function TechnicalMeasurementPlate({
                     }
                   />
 
-                  <g transform={`translate(${callout.box.x} ${callout.box.y})`}>
+                  <g transform={`translate(${calloutBox.x} ${calloutBox.y})`}>
                     <motion.g
                       animate={{opacity: 1, scale: 1, x: 0, y: 0}}
                       initial={
@@ -571,7 +641,7 @@ export function TechnicalMeasurementPlate({
                                 ? 'rgba(139,107,40,0.18)'
                                 : 'rgba(32,56,74,0.09)',
                           }}
-                          height={callout.box.height}
+                          height={calloutHeight}
                           rx="18"
                           style={{
                             filter: isSelected
@@ -579,15 +649,15 @@ export function TechnicalMeasurementPlate({
                               : undefined,
                           }}
                           transition={chipTransition}
-                          width={callout.box.width}
+                          width={calloutWidth}
                         />
                         <motion.circle
                           animate={{
                             fill: isSelected ? guidance : isMeasured ? gold : 'rgba(32,56,74,0.24)',
                           }}
-                          cx="14"
-                          cy={callout.box.height / 2}
-                          r="4"
+                          cx={calloutDotX}
+                          cy={calloutHeight / 2}
+                          r={isMobileViewport ? 5 : 4}
                           transition={chipTransition}
                         />
                         <motion.text
@@ -595,15 +665,15 @@ export function TechnicalMeasurementPlate({
                             fill: isSelected ? paper : isMeasured ? gold : ink,
                           }}
                           fontFamily='"Hanken Grotesk", "Avenir Next", "Segoe UI", sans-serif'
-                          fontSize="10.75"
+                          fontSize={isMobileViewport ? 19 : 10.75}
                           fontWeight="700"
                           letterSpacing="0.16em"
                           transition={chipTransition}
-                          x="26"
-                          y={callout.labelLines.length === 1 ? callout.box.height / 2 + 4 : 17}
+                          x={calloutTextX}
+                          y={calloutTextY}
                         >
                           {callout.labelLines.map((line, index) => (
-                            <tspan dy={index === 0 ? 0 : 13} key={line} x="26">
+                            <tspan dy={index === 0 ? 0 : calloutLineDy} key={line} x={calloutTextX}>
                               {line.charAt(0).toUpperCase() + line.slice(1).toLowerCase()}
                             </tspan>
                           ))}
@@ -633,9 +703,28 @@ export function TechnicalMeasurementPlate({
   );
 }
 
-function buildLeaderPath(callout: PlateCallout) {
-  const startX = callout.side === 'left' ? callout.box.x + callout.box.width : callout.box.x;
-  const startY = callout.box.y + callout.box.height / 2;
+function buildLeaderPath(
+  callout: PlateCallout,
+  box: {x: number; y: number},
+  boxWidth: number,
+  boxHeight: number,
+  isMobileFront = false,
+) {
+  const startX = callout.side === 'left' ? box.x + boxWidth : box.x;
+  const startY = box.y + boxHeight / 2;
+
+  if (isMobileFront && callout.key === 'bust') {
+    const controlX = startX + 58;
+    const endX = callout.anchor.x - 16;
+    return `M${startX} ${startY} C${controlX} ${startY} ${endX} ${callout.anchor.y} ${callout.anchor.x} ${callout.anchor.y}`;
+  }
+
+  if (isMobileFront && callout.key === 'neck') {
+    const controlX = startX - 44;
+    const endX = callout.anchor.x + 28;
+    return `M${startX} ${startY} C${controlX} ${startY - 18} ${endX} ${callout.anchor.y - 6} ${callout.anchor.x} ${callout.anchor.y}`;
+  }
+
   const midX =
     callout.side === 'left'
       ? Math.min(callout.anchor.x - 18, startX + 44)
