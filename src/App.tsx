@@ -196,6 +196,7 @@ export default function App() {
   const [isSavingMeasurement, setIsSavingMeasurement] = useState(false);
   const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isPlateFullscreen, setIsPlateFullscreen] = useState(false);
   const [historyStatus, setHistoryStatus] = useState<HistoryStatus>('idle');
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [measurementHistory, setMeasurementHistory] =
@@ -217,6 +218,25 @@ export default function App() {
     selectedMeasurement && selectedProfile
       ? measurementDefinitionsByKey[selectedMeasurement]
       : null;
+
+  useEffect(() => {
+    if (!isPlateFullscreen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isPlateFullscreen]);
+
+  useEffect(() => {
+    if (!selectedProfile) {
+      setIsPlateFullscreen(false);
+    }
+  }, [selectedProfile]);
 
   const visibleDefinitions = useMemo(
     () => measurementDefinitions.filter((definition) => definition.view === currentView),
@@ -1016,11 +1036,13 @@ export default function App() {
                 <ProfileWorkspace
                   currentMeasurement={currentMeasurement}
                   currentView={currentView}
+                  isPlateFullscreen={isPlateFullscreen}
                   onOpenHistory={handleOpenHistory}
                   onOpenTimeline={handleOpenTimeline}
                   onSelectMeasurement={handleSelectMeasurement}
                   onSetCurrentView={setCurrentView}
                   onStartEditing={handleStartEditing}
+                  onTogglePlateFullscreen={() => setIsPlateFullscreen(true)}
                   onToggleUnit={handleToggleUnit}
                   profile={selectedProfile}
                   selectedMeasurement={selectedMeasurement}
@@ -1048,6 +1070,36 @@ export default function App() {
           ) : null}
         </section>
       </main>
+
+      <AnimatePresence>
+        {isPlateFullscreen && selectedProfile ? (
+          <motion.div
+            animate={{opacity: 1}}
+            className="fixed inset-0 z-50 bg-background sm:hidden"
+            exit={{opacity: 0}}
+            initial={{opacity: 0}}
+            transition={prefersReducedMotion ? {duration: 0.01} : {duration: 0.22, ease: elegantEase}}
+          >
+            <TechnicalMeasurementPlate
+              currentView={currentView}
+              isFullscreen
+              isReadOnly
+              onEditSelectedMeasurement={() => {}}
+              onSetCurrentView={setCurrentView}
+              onToggleFullscreen={() => setIsPlateFullscreen(false)}
+              onToggleUnit={handleToggleUnit}
+              onSelectMeasurement={handleSelectMeasurement}
+              profile={selectedProfile}
+              selectedMeasurement={selectedMeasurement}
+              selectedMeasurementLabel={currentMeasurement?.label ?? null}
+              selectedMeasurementValueCm={
+                currentMeasurement ? selectedProfile.measurements[currentMeasurement.key] : null
+              }
+              unit={unit}
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isTimelineOpen && selectedProfile ? (
@@ -1646,11 +1698,13 @@ function ProfileSwitcher({
 function ProfileWorkspace({
   currentMeasurement,
   currentView,
+  isPlateFullscreen,
   onOpenHistory,
   onOpenTimeline,
   onSelectMeasurement,
   onSetCurrentView,
   onStartEditing,
+  onTogglePlateFullscreen,
   onToggleUnit,
   profile,
   selectedMeasurement,
@@ -1659,11 +1713,13 @@ function ProfileWorkspace({
 }: {
   currentMeasurement: (typeof measurementDefinitions)[number] | null;
   currentView: MeasurementView;
+  isPlateFullscreen: boolean;
   onOpenHistory: () => void;
   onOpenTimeline: () => void;
   onSelectMeasurement: (measurementKey: MeasurementKey) => void;
   onSetCurrentView: (view: MeasurementView) => void;
   onStartEditing: (measurementKey?: MeasurementKey) => void;
+  onTogglePlateFullscreen: () => void;
   onToggleUnit: () => void;
   profile: Profile;
   selectedMeasurement: MeasurementKey | null;
@@ -1712,8 +1768,10 @@ function ProfileWorkspace({
           <div className="relative w-full">
             <TechnicalMeasurementPlate
               currentView={currentView}
+              isFullscreen={isPlateFullscreen}
               onEditSelectedMeasurement={onStartEditing}
               onSetCurrentView={onSetCurrentView}
+              onToggleFullscreen={onTogglePlateFullscreen}
               onToggleUnit={onToggleUnit}
               onSelectMeasurement={onSelectMeasurement}
               profile={profile}

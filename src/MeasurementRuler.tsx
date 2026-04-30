@@ -4,6 +4,8 @@ import type {Unit} from './types';
 
 type MeasurementRulerProps = {
   hasRecordedValue: boolean;
+  isFullscreen?: boolean;
+  isReadOnly?: boolean;
   onEditSelectedMeasurement?: () => void;
   selectedLabel: string | null;
   unit: Unit;
@@ -30,6 +32,8 @@ const easeOutQuint = [0.22, 1, 0.36, 1] as const;
 
 export function MeasurementRuler({
   hasRecordedValue,
+  isFullscreen = false,
+  isReadOnly = false,
   onEditSelectedMeasurement,
   selectedLabel,
   unit,
@@ -139,6 +143,7 @@ export function MeasurementRuler({
                 : {opacity: 0, y: 14, scale: 0.88, filter: 'drop-shadow(0 0 0 rgba(3,25,46,0))'}
             }
             onClick={() => onEditSelectedMeasurement?.()}
+            disabled={isReadOnly}
             transition={
               prefersReducedMotion
                 ? {duration: 0.01}
@@ -161,7 +166,7 @@ export function MeasurementRuler({
                   {selectedLabel}
                 </p>
               <p className="type-metric-sm mt-0 text-white md:mt-1">
-                  <span className="text-[22px] leading-[1] md:hidden">{mobileBadgeValue}</span>
+                  <span className={`${isFullscreen ? 'text-[26px]' : 'text-[22px]'} leading-[1] md:hidden`}>{mobileBadgeValue}</span>
                   <span className="hidden md:inline">{badgeValue}</span>
                 </p>
               </motion.div>

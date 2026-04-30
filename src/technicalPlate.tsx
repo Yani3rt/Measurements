@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
-import {ArrowRightLeft, RotateCcw, User} from 'lucide-react';
+import {ArrowRightLeft, Maximize2, Minimize2, RotateCcw, User} from 'lucide-react';
 import frontAsset from '../front.svg';
 import backAsset from '../back.svg';
 import {MeasurementRuler} from './MeasurementRuler';
@@ -109,6 +109,9 @@ const calloutsByView: Record<MeasurementView, PlateCallout[]> = {
 
 export function TechnicalMeasurementPlate({
   currentView,
+  isFullscreen = false,
+  isReadOnly = false,
+  onToggleFullscreen,
   onEditSelectedMeasurement,
   onSetCurrentView,
   onToggleUnit,
@@ -120,6 +123,9 @@ export function TechnicalMeasurementPlate({
   unit,
 }: {
   currentView: MeasurementView;
+  isFullscreen?: boolean;
+  isReadOnly?: boolean;
+  onToggleFullscreen?: () => void;
   onEditSelectedMeasurement: () => void;
   onSetCurrentView: (view: MeasurementView) => void;
   onToggleUnit: () => void;
@@ -186,7 +192,11 @@ export function TechnicalMeasurementPlate({
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-[2.35rem] border border-primary/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(248,246,239,0.95))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] sm:p-4">
+    <div className={`relative overflow-hidden border border-primary/8 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] sm:p-4 ${
+      isFullscreen
+        ? 'h-full rounded-none bg-[linear-gradient(180deg,var(--color-background)_0%,rgba(248,246,239,0.96)_18%,rgba(248,246,239,0.96)_82%,var(--color-background)_100%)]'
+        : 'rounded-[2.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(248,246,239,0.95))]'
+    }`}>
       <div className="absolute left-4 top-4 z-20 sm:left-6 sm:top-5">
         <div className="inline-flex rounded-full bg-white/92 p-1 shadow-[0_14px_32px_-24px_rgba(3,25,46,0.38)] ring-1 ring-outline-variant/10 backdrop-blur-sm">
           {([
@@ -219,25 +229,39 @@ export function TechnicalMeasurementPlate({
         </div>
       </div>
       <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-5">
-        <button
-          aria-label={`Switch units to ${unit === 'cm' ? 'in' : 'cm'}`}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-primary shadow-[0_14px_32px_-24px_rgba(3,25,46,0.38)] ring-1 ring-outline-variant/10 backdrop-blur-sm transition-all hover:bg-white"
-          onClick={onToggleUnit}
-          type="button"
-        >
-          <ArrowRightLeft size={14} />
-        </button>
+        <div className="flex items-center gap-2">
+          {onToggleFullscreen ? (
+            <button
+              aria-label={isFullscreen ? 'Return to normal plate view' : 'Open full screen plate view'}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-primary shadow-[0_14px_32px_-24px_rgba(3,25,46,0.38)] ring-1 ring-outline-variant/10 backdrop-blur-sm transition-all hover:bg-white sm:hidden"
+              onClick={onToggleFullscreen}
+              type="button"
+            >
+              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+          ) : null}
+          <button
+            aria-label={`Switch units to ${unit === 'cm' ? 'in' : 'cm'}`}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-primary shadow-[0_14px_32px_-24px_rgba(3,25,46,0.38)] ring-1 ring-outline-variant/10 backdrop-blur-sm transition-all hover:bg-white"
+            onClick={onToggleUnit}
+            type="button"
+          >
+            <ArrowRightLeft size={14} />
+          </button>
+        </div>
       </div>
       <div className="absolute inset-x-4 top-3 z-10 sm:inset-x-6 sm:top-4">
         <MeasurementRuler
           hasRecordedValue={selectedMeasurementValueCm !== null && selectedMeasurementValueCm > 0}
+          isFullscreen={isFullscreen}
+          isReadOnly={isReadOnly}
           onEditSelectedMeasurement={onEditSelectedMeasurement}
           selectedLabel={selectedMeasurementLabel}
           unit={unit}
           valueCm={selectedMeasurementValueCm}
         />
       </div>
-      <div className="pt-[5.5rem] sm:pt-[6rem] md:pt-[5.25rem] lg:pt-[4.5rem]">
+      <div className={`relative pt-[5.5rem] sm:pt-[6rem] md:pt-[5.25rem] lg:pt-[4.5rem] ${isFullscreen ? 'flex h-full items-center' : ''}`}>
         <svg
           aria-label={`${currentView} measurement diagram for ${profile.name}`}
           className="block h-auto w-full"
