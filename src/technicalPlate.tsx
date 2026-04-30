@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
-import {ArrowRightLeft} from 'lucide-react';
+import {ArrowRightLeft, RotateCcw, User} from 'lucide-react';
 import frontAsset from '../front.svg';
 import backAsset from '../back.svg';
 import {MeasurementRuler} from './MeasurementRuler';
@@ -155,7 +155,7 @@ export function TechnicalMeasurementPlate({
           ] as const).map((option) => (
             <button
               key={option.value}
-              className={`relative rounded-full px-4 py-2 transition-all ${
+              className={`relative inline-flex items-center gap-2 rounded-full px-3 py-2 transition-all sm:gap-0 sm:px-4 ${
                 option.value === currentView
                   ? 'text-white shadow-[0_10px_18px_-14px_rgba(3,25,46,0.72)]'
                   : 'text-primary/68'
@@ -170,7 +170,10 @@ export function TechnicalMeasurementPlate({
                   transition={settleTransition}
                 />
               ) : null}
-              <span className="type-button relative z-10">{option.label}</span>
+              <span className="relative z-10 sm:hidden">
+                {option.value === 'front' ? <User size={14} /> : <RotateCcw size={14} />}
+              </span>
+              <span className="type-button relative z-10 hidden sm:inline">{option.label}</span>
             </button>
           ))}
         </div>

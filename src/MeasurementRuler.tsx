@@ -48,14 +48,14 @@ export function MeasurementRuler({
     ? hasRecordedValue && recordedValue !== null
       ? `${stripTrailingZeroes(recordedValue)} ${unit}`
       : 'Add'
-    : 'Select one';
-  const mobileBadgeValue = selectedLabel ? badgeValue : 'Select';
+    : null;
+  const mobileBadgeValue = badgeValue;
   const rulerTransition = prefersReducedMotion
     ? {duration: 0.01}
     : {type: 'spring', stiffness: 140, damping: 24, mass: 0.8};
   const badgeTransition = prefersReducedMotion
     ? {duration: 0.01}
-    : {duration: 0.26, ease: easeOutQuint};
+    : {duration: 0.42, ease: easeOutQuint};
   const hasSelection = Boolean(selectedLabel);
 
   return (
@@ -119,42 +119,56 @@ export function MeasurementRuler({
         </motion.div>
       </div>
 
-      <motion.button
-        className={`pointer-events-auto absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full px-3 py-1.5 text-center md:bottom-3 md:px-4 md:py-2 ${
-          hasSelection
-            ? 'bg-primary ring-1 ring-guidance/45 shadow-[0_18px_32px_-20px_rgba(36,88,92,0.45)]'
-            : 'bg-primary shadow-[0_16px_30px_-22px_rgba(3,25,46,0.8)]'
-        }`}
-        disabled={!selectedLabel}
-        initial={false}
-        onClick={() => onEditSelectedMeasurement?.()}
-        transition={badgeTransition}
-        type="button"
-      >
-        <AnimatePresence initial={false} mode="wait">
-          <motion.div
-            animate={{opacity: 1, y: 0}}
-            exit={{opacity: 0, y: prefersReducedMotion ? 0 : -4}}
-            initial={{opacity: 0, y: prefersReducedMotion ? 0 : 6}}
-            key={`${selectedLabel ?? 'empty'}-${badgeValue}`}
-            transition={badgeTransition}
+      <AnimatePresence initial={false}>
+        {hasSelection && badgeValue ? (
+          <motion.button
+            animate={
+              prefersReducedMotion
+                ? {opacity: 1}
+                : {opacity: 1, y: 0, scale: 1, filter: 'drop-shadow(0 10px 18px rgba(3,25,46,0.14))'}
+            }
+            className="pointer-events-auto absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1.5 text-center ring-1 ring-guidance/45 shadow-[0_18px_32px_-20px_rgba(36,88,92,0.45)] md:bottom-3 md:px-4 md:py-2"
+            exit={
+              prefersReducedMotion
+                ? {opacity: 0}
+                : {opacity: 0, y: -10, scale: 0.92, filter: 'drop-shadow(0 0 0 rgba(3,25,46,0))'}
+            }
+            initial={
+              prefersReducedMotion
+                ? {opacity: 1}
+                : {opacity: 0, y: 14, scale: 0.88, filter: 'drop-shadow(0 0 0 rgba(3,25,46,0))'}
+            }
+            onClick={() => onEditSelectedMeasurement?.()}
+            transition={
+              prefersReducedMotion
+                ? {duration: 0.01}
+                : {
+                    duration: 0.52,
+                    ease: easeOutQuint,
+                  }
+            }
+            type="button"
           >
-            <p className="type-label hidden text-white/60 md:block">
-              {selectedLabel ?? 'Selected measurement'}
-            </p>
-            <p className="type-metric-sm mt-0 text-white md:mt-1">
-              <span
-                className={`md:hidden ${
-                  selectedLabel ? '' : 'text-[1.2rem] leading-[1] tracking-[-0.01em]'
-                }`}
+            <AnimatePresence initial={false} mode="wait">
+              <motion.div
+                animate={{opacity: 1, y: 0}}
+                exit={{opacity: 0, y: prefersReducedMotion ? 0 : -4}}
+                initial={{opacity: 0, y: prefersReducedMotion ? 0 : 6}}
+                key={`${selectedLabel}-${badgeValue}`}
+                transition={badgeTransition}
               >
-                {mobileBadgeValue}
-              </span>
-              <span className="hidden md:inline">{badgeValue}</span>
-            </p>
-          </motion.div>
-        </AnimatePresence>
-      </motion.button>
+                <p className="type-label hidden text-white/60 md:block">
+                  {selectedLabel}
+                </p>
+                <p className="type-metric-sm mt-0 text-white md:mt-1">
+                  <span className="md:hidden">{mobileBadgeValue}</span>
+                  <span className="hidden md:inline">{badgeValue}</span>
+                </p>
+              </motion.div>
+            </AnimatePresence>
+          </motion.button>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

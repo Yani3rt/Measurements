@@ -849,9 +849,10 @@ export default function App() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-8">
           <div>
             <p className="type-overline text-secondary">
-              Household Wardrobe Reference
+              <span className="sm:hidden">Atelier</span>
+              <span className="hidden sm:inline">Household Wardrobe Reference</span>
             </p>
-            <h1 className="type-title text-primary">The Atelier</h1>
+            <h1 className="type-title hidden text-primary sm:block">The Atelier</h1>
           </div>
           <div className="flex items-center gap-3">
             <div className="group relative">
@@ -969,7 +970,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="relative mx-auto max-w-[96rem] px-4 py-6 md:px-8 md:py-8">
+      <main className="relative mx-auto max-w-[96rem] px-4 pb-6 pt-3 md:px-8 md:py-8">
         <section className="min-h-[42rem] rounded-[2.4rem] bg-surface/92 p-5 shadow-[0_12px_32px_-4px_rgba(26,28,25,0.06)] ring-1 ring-outline-variant/12 md:p-7">
           {apiStatus === 'loading' ? (
             <SubtleWorkspaceSkeleton />
@@ -1251,11 +1252,11 @@ function AuthStateScreen({
           <div className="grid gap-0 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
             <div className="flex flex-col justify-center p-8 md:p-10 lg:p-12">
               <div className="mb-8">
-                <p className="type-overline text-secondary">
+                <p className="type-overline hidden text-secondary sm:block">
                   {eyebrow ?? 'Protected workspace'}
                 </p>
                 <h1 className="type-title mt-3 text-primary">{title}</h1>
-                <p className="type-body mt-5 text-on-surface-variant">{body}</p>
+                <p className="type-body mt-5 hidden text-on-surface-variant sm:block">{body}</p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
@@ -1267,7 +1268,7 @@ function AuthStateScreen({
                   <p className="type-label text-on-surface-variant">Views</p>
                   <p className="type-note mt-2 text-primary">Front and back, kept in step.</p>
                 </div>
-                <div className="rounded-[1.6rem] bg-surface-container-low/92 p-4 ring-1 ring-outline-variant/10">
+                <div className="hidden rounded-[1.6rem] bg-surface-container-low/92 p-4 ring-1 ring-outline-variant/10 sm:block">
                   <p className="type-label text-on-surface-variant">Units</p>
                   <p className="type-note mt-2 text-primary">Switch cm or in whenever needed.</p>
                 </div>
@@ -1484,14 +1485,41 @@ function ProfileSwitcher({
       <AnimatePresence>
         {isOpen && profiles.length > 0 ? (
           <motion.div
-            animate={{opacity: 1, y: 0, scale: 1}}
+            animate={
+              prefersReducedMotion
+                ? {opacity: 1}
+                : {
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    filter: 'drop-shadow(0 16px 30px rgba(3,25,46,0.14))',
+                  }
+            }
             className="absolute right-0 z-40 mt-3 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[1.8rem] bg-background/98 p-3 shadow-[0_24px_60px_-32px_rgba(3,25,46,0.34)] ring-1 ring-outline-variant/12 backdrop-blur-md"
-            exit={{opacity: 0, y: -4, scale: 0.995}}
-            initial={{opacity: 0, y: -4, scale: 0.995}}
+            exit={
+              prefersReducedMotion
+                ? {opacity: 0}
+                : {
+                    opacity: 0,
+                    y: -12,
+                    scale: 0.96,
+                    filter: 'drop-shadow(0 0 0 rgba(3,25,46,0))',
+                  }
+            }
+            initial={
+              prefersReducedMotion
+                ? {opacity: 1}
+                : {
+                    opacity: 0,
+                    y: -14,
+                    scale: 0.92,
+                    filter: 'drop-shadow(0 0 0 rgba(3,25,46,0))',
+                  }
+            }
             transition={
               prefersReducedMotion
                 ? {duration: 0.01}
-                : {duration: 0.12, ease: decisiveEase}
+                : {duration: 0.46, ease: elegantEase}
             }
           >
             <div className="px-3 pb-3 pt-1">
@@ -1677,11 +1705,11 @@ function ProfileWorkspace({
     >
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(24rem,0.58fr)] xl:items-start 2xl:grid-cols-[minmax(0,0.88fr)_minmax(27rem,0.6fr)]">
         <motion.div
-          className="relative overflow-hidden rounded-[2.5rem] bg-[linear-gradient(180deg,rgba(244,244,239,0.88),rgba(250,250,245,0.96))] p-4 ring-1 ring-outline-variant/12 md:p-6 xl:sticky xl:top-[7.25rem] xl:p-5"
+          className="-mx-5 -mt-5 relative overflow-hidden rounded-[2.5rem] bg-[linear-gradient(180deg,rgba(244,244,239,0.88),rgba(250,250,245,0.96))] p-0 ring-1 ring-outline-variant/12 md:mx-0 md:mt-0 md:p-6 xl:sticky xl:top-[7.25rem] xl:p-5"
           variants={fadeUpVariants}
         >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(253,220,152,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(3,25,46,0.06),transparent_28%)]" />
-          <div className="relative mx-auto xl:max-w-[35rem] 2xl:max-w-[36.5rem]">
+          <div className="relative w-full">
             <TechnicalMeasurementPlate
               currentView={currentView}
               onEditSelectedMeasurement={onStartEditing}
