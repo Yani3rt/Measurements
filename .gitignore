@@ -9,3 +9,4 @@ output/
 data/
 .env*
 !.env.example
+.vercel

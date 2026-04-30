@@ -30,13 +30,17 @@ import {
   deleteProfile as deleteStoredProfile,
   loadMeasurementHistory,
   loadProfileHeightHistory,
+  loadProfileTimeline,
   loadProfiles,
   saveMeasurement as saveStoredMeasurement,
   updateProfile as updateStoredProfile,
   type MeasurementHistoryResponse,
   type ProfileHeightHistoryResponse,
+  type ProfileTimelineResponse,
 } from './storage';
+import {FittingTimeline} from './FittingTimeline';
 import {TechnicalMeasurementPlate} from './technicalPlate';
+import {useDialogAccessibility} from './useDialogAccessibility';
 import {
   formatMeasurement,
   getCompletionSummary,
@@ -198,6 +202,11 @@ export default function App() {
     useState<MeasurementHistoryResponse | null>(null);
   const [heightHistory, setHeightHistory] =
     useState<ProfileHeightHistoryResponse | null>(null);
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+  const [timelineStatus, setTimelineStatus] = useState<HistoryStatus>('idle');
+  const [timelineError, setTimelineError] = useState<string | null>(null);
+  const [profileTimeline, setProfileTimeline] =
+    useState<ProfileTimelineResponse | null>(null);
   const hasLoadedProfilesRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
 
@@ -324,6 +333,9 @@ export default function App() {
     setProfileSubmitError(null);
     setMeasurementSubmitError(null);
     setActionError(null);
+    setTimelineError(null);
+    setProfileTimeline(null);
+    setIsTimelineOpen(false);
     setServiceError(null);
     setApiStatus('ready');
     hasLoadedProfilesRef.current = false;
@@ -375,7 +387,7 @@ export default function App() {
         setIsQuickAddOpen(false);
         setApiStatus('offline');
         setServiceError(
-          getErrorMessage(error, 'Unable to reach the local data service.'),
+          getErrorMessage(error, 'Unable to reach Supabase right now.'),
         );
       }
     }
@@ -391,6 +403,7 @@ export default function App() {
     if (!selectedProfile) {
       setSelectedMeasurement(null);
       setIsEditingMeasurement(false);
+      setIsTimelineOpen(false);
       return;
     }
 
@@ -556,6 +569,7 @@ export default function App() {
     setSelectedMeasurement(null);
     setIsEditingMeasurement(false);
     setIsHistoryOpen(false);
+    setIsTimelineOpen(false);
     setIsProfilesMenuOpen(false);
   }
 
@@ -564,6 +578,27 @@ export default function App() {
     setCurrentView(measurementDefinitionsByKey[measurementKey].view);
     setSelectedMeasurement(measurementKey);
     setIsEditingMeasurement(false);
+  }
+
+  async function handleOpenTimeline() {
+    if (!selectedProfile) {
+      return;
+    }
+
+    setIsTimelineOpen(true);
+    setTimelineStatus('loading');
+    setTimelineError(null);
+
+    try {
+      const timeline = await loadProfileTimeline(selectedProfile.id);
+
+      setProfileTimeline(timeline);
+      setTimelineStatus('ready');
+    } catch (error) {
+      setProfileTimeline(null);
+      setTimelineError(getErrorMessage(error, 'Unable to load the fitting timeline.'));
+      setTimelineStatus('error');
+    }
   }
 
   async function handleOpenHistory() {
@@ -951,14 +986,14 @@ export default function App() {
               }
               body={
                 serviceError ??
-                'The local data service is unavailable. Start it with pnpm dev, then retry.'
+                'Supabase is unavailable right now. Check your connection, then retry.'
               }
               eyebrow="Connection needed"
               illustrationAlt="The Atelier mascot presenting a gentle connection reminder."
               illustrationSrc={mascotGuideImage}
-              noteBody="If you are working locally, start the app services first and then retry this page."
+              noteBody="If you are working locally, confirm your Supabase keys are configured and then retry this page."
               noteTitle="Atelier note"
-              title="Data service offline"
+              title="Supabase offline"
             />
           ) : selectedProfile ? (
             <AnimatePresence initial={false} mode="wait">
@@ -981,6 +1016,7 @@ export default function App() {
                   currentMeasurement={currentMeasurement}
                   currentView={currentView}
                   onOpenHistory={handleOpenHistory}
+                  onOpenTimeline={handleOpenTimeline}
                   onSelectMeasurement={handleSelectMeasurement}
                   onSetCurrentView={setCurrentView}
                   onStartEditing={handleStartEditing}
@@ -1011,6 +1047,20 @@ export default function App() {
           ) : null}
         </section>
       </main>
+
+      <AnimatePresence>
+        {isTimelineOpen && selectedProfile ? (
+          <FittingTimeline
+            error={timelineError}
+            onClose={() => setIsTimelineOpen(false)}
+            onRetry={() => void handleOpenTimeline()}
+            profile={selectedProfile}
+            status={timelineStatus}
+            timeline={profileTimeline}
+            unit={unit}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isHistoryOpen && selectedProfile && selectedMeasurement ? (
@@ -1569,6 +1619,7 @@ function ProfileWorkspace({
   currentMeasurement,
   currentView,
   onOpenHistory,
+  onOpenTimeline,
   onSelectMeasurement,
   onSetCurrentView,
   onStartEditing,
@@ -1581,6 +1632,7 @@ function ProfileWorkspace({
   currentMeasurement: (typeof measurementDefinitions)[number] | null;
   currentView: MeasurementView;
   onOpenHistory: () => void;
+  onOpenTimeline: () => void;
   onSelectMeasurement: (measurementKey: MeasurementKey) => void;
   onSetCurrentView: (view: MeasurementView) => void;
   onStartEditing: (measurementKey?: MeasurementKey) => void;
@@ -1742,8 +1794,17 @@ function ProfileWorkspace({
                     {currentView === 'front' ? 'Front measurements' : 'Back measurements'}
                   </h3>
                 </div>
-                <div className="type-button rounded-full bg-white/70 px-3 py-1 text-secondary">
-                  Displaying {unit}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    className="type-button rounded-full bg-primary px-3 py-2 text-white transition-transform active:scale-[0.98]"
+                    onClick={() => void onOpenTimeline()}
+                    type="button"
+                  >
+                    Timeline
+                  </button>
+                  <div className="type-button rounded-full bg-white/70 px-3 py-1 text-secondary">
+                    Displaying {unit}
+                  </div>
                 </div>
               </div>
 
@@ -2028,6 +2089,8 @@ function HistoryDrawer({
   const entries = measurementHistory?.entries ?? [];
   const latestEntry = entries.at(-1) ?? null;
   const heightEntries = heightHistory?.entries ?? [];
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogAccessibility({onClose, ref: dialogRef});
 
   return (
     <motion.div
@@ -2038,22 +2101,28 @@ function HistoryDrawer({
     >
       <div className="flex min-h-full justify-end">
         <motion.aside
+          ref={dialogRef}
+          aria-labelledby="measurement-history-title"
+          aria-modal="true"
           animate={{x: 0}}
           className="flex h-screen w-full max-w-xl flex-col overflow-hidden bg-background shadow-[0_30px_80px_-34px_rgba(3,25,46,0.5)] ring-1 ring-outline-variant/12"
           exit={{x: '100%'}}
           initial={{x: '100%'}}
+          role="dialog"
+          tabIndex={-1}
           transition={{duration: 0.28, ease: elegantEase}}
         >
           <div className="border-b border-outline-variant/10 p-5 md:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="type-overline text-secondary">Fitting history</p>
-                <h2 className="type-section-title text-primary">{selectedMeasurement.label}</h2>
+                <h2 className="type-section-title text-primary" id="measurement-history-title">{selectedMeasurement.label}</h2>
                 <p className="type-note mt-2 text-on-surface-variant">
                   {profile.name}’s selected measurement record and compact height archive.
                 </p>
               </div>
               <button
+                aria-label="Close measurement history"
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-primary"
                 onClick={onClose}
                 type="button"
@@ -2174,6 +2243,8 @@ function MeasurementEditModal({
 }) {
   const prefersReducedMotion = useReducedMotion();
   const alternateUnit = unit === 'cm' ? 'in' : 'cm';
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogAccessibility({onClose, ref: dialogRef});
 
   return (
     <motion.div
@@ -2184,19 +2255,25 @@ function MeasurementEditModal({
     >
       <div className="mx-auto flex h-full max-w-2xl items-end md:items-center">
         <motion.div
+          ref={dialogRef}
+          aria-labelledby="measurement-edit-title"
+          aria-modal="true"
           animate={{opacity: 1, y: 0}}
           className="w-full rounded-[2rem] rounded-b-none bg-background p-5 shadow-[0_30px_70px_-34px_rgba(3,25,46,0.42)] ring-1 ring-outline-variant/12 md:rounded-[2.2rem] md:p-7"
           exit={{opacity: 0, y: 24}}
           initial={{opacity: 0, y: 24}}
+          role="dialog"
+          tabIndex={-1}
         >
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="type-overline text-secondary">
                 Measurement edit
               </p>
-              <h2 className="type-section-title text-primary">{currentMeasurement.label}</h2>
+              <h2 className="type-section-title text-primary" id="measurement-edit-title">{currentMeasurement.label}</h2>
             </div>
             <button
+              aria-label="Close measurement editor"
               className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-low text-primary"
               onClick={onClose}
               type="button"
@@ -2332,6 +2409,8 @@ function ProfileDetailsModal({
   saveError: string | null;
 }) {
   const isEditMode = mode === 'edit';
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogAccessibility({onClose, ref: dialogRef});
 
   return (
     <motion.div
@@ -2342,17 +2421,22 @@ function ProfileDetailsModal({
     >
       <div className="mx-auto flex h-full max-w-2xl items-end md:items-center">
         <motion.div
+          ref={dialogRef}
+          aria-labelledby="profile-details-title"
+          aria-modal="true"
           animate={{opacity: 1, y: 0}}
           className="w-full rounded-[2rem] bg-background p-6 shadow-[0_24px_60px_-32px_rgba(26,28,25,0.35)] ring-1 ring-outline-variant/12 md:p-7"
           exit={{opacity: 0, y: 24}}
           initial={{opacity: 0, y: 24}}
+          role="dialog"
+          tabIndex={-1}
         >
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="type-overline text-secondary">
                 {isEditMode ? 'Edit profile' : 'Quick add'}
               </p>
-              <h2 className="type-section-title text-primary">
+              <h2 className="type-section-title text-primary" id="profile-details-title">
                 {isEditMode ? 'Update profile details' : 'Create a family profile'}
               </h2>
               <p className="type-note mt-2 max-w-lg text-on-surface-variant">
@@ -2404,7 +2488,7 @@ function ProfileDetailsModal({
                     heightCm: sanitizeDecimalInput(event.target.value),
                   })
                 }
-                placeholder="164"
+                placeholder="Enter height"
                 step="0.1"
                 value={draftProfile.heightCm}
               />

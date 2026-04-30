@@ -1,20 +1,22 @@
-import {createClient} from '@supabase/supabase-js';
+import {createClient, type SupabaseClient} from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseAuthConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-let browserClient: ReturnType<typeof createClient> | null = null;
+type BrowserSupabaseClient = SupabaseClient<any>;
 
-export function getSupabaseBrowserClient() {
+let browserClient: BrowserSupabaseClient | null = null;
+
+export function getSupabaseBrowserClient(): BrowserSupabaseClient {
   if (!isSupabaseAuthConfigured || !supabaseUrl || !supabaseAnonKey) {
     throw new Error(
       'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Add them to your .env file.',
     );
   }
 
-  browserClient ??= createClient(supabaseUrl, supabaseAnonKey, {
+  browserClient ??= createClient<any>(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: true,
       detectSessionInUrl: true,
