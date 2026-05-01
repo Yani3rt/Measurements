@@ -1973,7 +1973,7 @@ function ProfileWorkspace({
                     animate={
                       shouldAnimateGuidanceToggle ? {opacity: 1, y: 0} : {opacity: 1, y: 0}
                     }
-                    className="hidden flex-col gap-2 md:flex md:flex-row md:items-center md:justify-between lg:hidden"
+                    className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
                     exit={shouldAnimateGuidanceToggle ? {opacity: 0, y: -4} : undefined}
                     initial={shouldAnimateGuidanceToggle ? {opacity: 0, y: 6} : false}
                     key="empty-guidance"
@@ -1984,11 +1984,8 @@ function ProfileWorkspace({
                     }
                   >
                     <div>
-                      <p className="type-overline text-on-surface-variant">
-                        Ready to inspect
-                      </p>
-                      <p className="type-note mt-2 text-on-surface-variant">
-                        Tap a callout on the plate to bring a measurement into focus. Saved measurements gain a gold accent on the diagram.
+                      <p className="type-note text-on-surface-variant">
+                        Select a callout or card to view its fit tip.
                       </p>
                     </div>
                     <motion.div
