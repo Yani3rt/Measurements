@@ -77,8 +77,7 @@ Each route will validate input, return JSON, and respond with the updated profil
 
 ## Rollout Constraints
 
-- No auth in this pass.
-- No multi-user data partitioning in this pass.
+- Single local dataset in this pass.
 - No browser `localStorage` fallback in this pass.
 - No historical audit trail or sync engine in this pass.
 

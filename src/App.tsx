@@ -6,11 +6,8 @@ import {
   ChevronDown,
   Clock3,
   History,
-  LoaderCircle,
-  LogOut,
   PencilLine,
   Plus,
-  ShieldCheck,
   Trash2,
   Users,
   X,
@@ -20,28 +17,19 @@ import {
   measurementDefinitionsByKey,
 } from './measurements';
 import {
-  getSupabaseBrowserClient,
-  isSupabaseAuthConfigured,
-  signInWithGoogle,
-  signOutFromSupabase,
-} from './supabase';
-import {
-  clearAllAtelierLocalCache,
   createProfile as createStoredProfile,
   deleteProfile as deleteStoredProfile,
-  loadCachedProfiles,
   loadMeasurementHistory,
   loadProfileHeightHistory,
   loadProfileTimeline,
   loadProfiles,
-  removeProfileFromCacheList,
-  replaceProfileInCacheList,
+  removeProfileFromList,
+  replaceProfileInList,
   saveMeasurement as saveStoredMeasurement,
   updateProfile as updateStoredProfile,
   type MeasurementHistoryResponse,
   type ProfileHeightHistoryResponse,
   type ProfileTimelineResponse,
-  writeProfileCache,
 } from './storage';
 import {FittingTimeline} from './FittingTimeline';
 import {TechnicalMeasurementPlate} from './technicalPlate';
@@ -62,10 +50,8 @@ import {
 import type {MeasurementKey, MeasurementView, Profile, Sex, Unit} from './types';
 import emptyStateNoProfileImage from './assets/empty-state-no-profile.png';
 import mascotGuideImage from './assets/mascot-guide.png';
-import mascotLoginSceneImage from './assets/mascot-login-scene.png';
 
 type ApiStatus = 'loading' | 'ready' | 'offline';
-type AuthStatus = 'loading' | 'signed_in' | 'signed_out' | 'config_error';
 
 type DraftProfile = {
   name: string;
@@ -175,15 +161,8 @@ function getProfileInitials(name: string) {
 }
 
 export default function App() {
-  const [authStatus, setAuthStatus] = useState<AuthStatus>(
-    isSupabaseAuthConfigured ? 'loading' : 'config_error',
-  );
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [isAuthPending, setIsAuthPending] = useState(false);
-  const [authenticatedUserId, setAuthenticatedUserId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [apiStatus, setApiStatus] = useState<ApiStatus>('loading');
-  const [isRevalidatingProfiles, setIsRevalidatingProfiles] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<MeasurementView>('front');
@@ -216,14 +195,10 @@ export default function App() {
   const [profileTimeline, setProfileTimeline] =
     useState<ProfileTimelineResponse | null>(null);
   const hasLoadedProfilesRef = useRef(false);
-  const authenticatedUserIdRef = useRef<string | null>(null);
-  const previousAuthenticatedUserIdRef = useRef<string | null>(null);
-  const profileSessionKeyRef = useRef<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
 
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) ?? null;
-  const shouldShowWorkspaceSkeleton = apiStatus === 'loading' && !isRevalidatingProfiles;
-  const shouldShowRevalidationNotice = apiStatus === 'loading' && isRevalidatingProfiles;
+  const shouldShowWorkspaceSkeleton = apiStatus === 'loading';
   const shouldHighlightAddProfile =
     apiStatus === 'ready' && profiles.length === 0 && !prefersReducedMotion;
   const currentMeasurement =
@@ -281,198 +256,20 @@ export default function App() {
         : null;
   const canSaveMeasurement = !measurementError;
 
-  function createProfileSessionKey(userId: string) {
-    const randomSegment =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-    return `${userId}:${randomSegment}`;
-  }
-
-  function cacheConfirmedProfiles(nextProfiles: Profile[]) {
-    const userId = authenticatedUserIdRef.current;
-    const sessionKey = profileSessionKeyRef.current;
-
-    if (userId && sessionKey) {
-      try {
-        writeProfileCache(window.localStorage, userId, sessionKey, nextProfiles);
-      } catch {
-        // Cache writes are best effort. Ignore unavailable localStorage access.
-      }
-    }
-  }
-
   function replaceProfilesFromServer(nextProfiles: Profile[]) {
     setProfiles(nextProfiles);
-    cacheConfirmedProfiles(nextProfiles);
   }
 
   function updateProfilesFromServer(updater: (currentProfiles: Profile[]) => Profile[]) {
-    setProfiles((currentProfiles) => {
-      const nextProfiles = updater(currentProfiles);
-      cacheConfirmedProfiles(nextProfiles);
-      return nextProfiles;
-    });
-  }
-
-  function observeAuthenticatedUser(userId: string) {
-    const previousUserId = previousAuthenticatedUserIdRef.current;
-
-    if (previousUserId !== userId) {
-      clearAllAtelierLocalCache();
-      profileSessionKeyRef.current = createProfileSessionKey(userId);
-      hasLoadedProfilesRef.current = false;
-    }
-
-    previousAuthenticatedUserIdRef.current = userId;
-    authenticatedUserIdRef.current = userId;
-    setAuthenticatedUserId(userId);
-  }
-
-  function clearAuthenticatedUserContext() {
-    authenticatedUserIdRef.current = null;
-    setAuthenticatedUserId(null);
-    profileSessionKeyRef.current = null;
+    setProfiles((currentProfiles) => updater(currentProfiles));
   }
 
   useEffect(() => {
-    if (!isSupabaseAuthConfigured) {
-      setAuthStatus('config_error');
-      return;
-    }
-
-    const supabase = getSupabaseBrowserClient();
-    let cancelled = false;
-
-    async function hydrateSession() {
-      try {
-        const {
-          data: {session},
-          error,
-        } = await supabase.auth.getSession();
-
-        if (cancelled) {
-          return;
-        }
-
-        if (error) {
-          throw error;
-        }
-
-        if (session?.user?.id) {
-          observeAuthenticatedUser(session.user.id);
-          setApiStatus('loading');
-        } else {
-          clearAuthenticatedUserContext();
-        }
-        setAuthStatus(session ? 'signed_in' : 'signed_out');
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        setAuthStatus('signed_out');
-        setAuthError(getErrorMessage(error, 'Unable to restore your session.'));
-      }
-    }
-
-    void hydrateSession();
-
-    const {
-      data: {subscription},
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' || (session?.user?.id && previousAuthenticatedUserIdRef.current !== session.user.id)) {
-        clearAllAtelierLocalCache();
-        previousAuthenticatedUserIdRef.current = null;
-      }
-
-      if (session?.user?.id) {
-        observeAuthenticatedUser(session.user.id);
-        setApiStatus('loading');
-        setAuthError(null);
-      } else {
-        clearAuthenticatedUserContext();
-      }
-
-      setAuthStatus(session ? 'signed_in' : 'signed_out');
-      setIsAuthPending(false);
-    });
-
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isHistoryOpen || !selectedProfile || !selectedMeasurement) {
-      return;
-    }
-
-    void handleOpenHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHistoryOpen, selectedMeasurement, selectedProfile?.id]);
-
-  useEffect(() => {
-    if (authStatus === 'signed_in') {
-      return;
-    }
-
-    setProfiles([]);
-    setSelectedProfileId(null);
-    setSelectedMeasurement(null);
-    setIsEditingMeasurement(false);
-    setIsQuickAddOpen(false);
-    setProfileModalMode('create');
-    setEditingProfileId(null);
-    setDraftProfile(defaultDraftProfile);
-    setProfileSubmitError(null);
-    setMeasurementSubmitError(null);
-    setActionError(null);
-    setTimelineError(null);
-    setProfileTimeline(null);
-    setIsTimelineOpen(false);
-    setServiceError(null);
-    setIsRevalidatingProfiles(false);
-    setApiStatus('ready');
-    hasLoadedProfilesRef.current = false;
-    clearAllAtelierLocalCache();
-    clearAuthenticatedUserContext();
-  }, [authStatus]);
-
-  useEffect(() => {
-    if (authStatus !== 'signed_in' || !authenticatedUserId) {
-      return;
-    }
-
     let cancelled = false;
 
     async function hydrateProfiles() {
       setApiStatus('loading');
-      setIsRevalidatingProfiles(false);
       setServiceError(null);
-
-      const sessionKey = profileSessionKeyRef.current;
-      if (sessionKey) {
-        const cachedProfiles = await loadCachedProfiles(sessionKey);
-
-        if (cancelled) {
-          return;
-        }
-
-        if (cachedProfiles) {
-          setIsRevalidatingProfiles(true);
-          setProfiles(cachedProfiles);
-          setSelectedProfileId((current) => {
-            if (current && cachedProfiles.some((profile) => profile.id === current)) {
-              return current;
-            }
-
-            return cachedProfiles[0]?.id ?? null;
-          });
-        }
-      }
 
       try {
         const nextProfiles = await loadProfiles();
@@ -482,7 +279,6 @@ export default function App() {
         }
 
         replaceProfilesFromServer(nextProfiles);
-        setIsRevalidatingProfiles(false);
         setApiStatus('ready');
         setActionError(null);
         setSelectedProfileId((current) => {
@@ -508,10 +304,9 @@ export default function App() {
         setSelectedMeasurement(null);
         setIsEditingMeasurement(false);
         setIsQuickAddOpen(false);
-        setIsRevalidatingProfiles(false);
         setApiStatus('offline');
         setServiceError(
-          getErrorMessage(error, 'Unable to reach Supabase right now.'),
+          getErrorMessage(error, 'Unable to reach the local data service.'),
         );
       }
     }
@@ -521,7 +316,16 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [authStatus, authenticatedUserId]);
+  }, []);
+
+  useEffect(() => {
+    if (!isHistoryOpen || !selectedProfile || !selectedMeasurement) {
+      return;
+    }
+
+    void handleOpenHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHistoryOpen, selectedMeasurement, selectedProfile?.id]);
 
   useEffect(() => {
     if (!selectedProfile) {
@@ -553,32 +357,6 @@ export default function App() {
     setProfileModalMode('create');
     setEditingProfileId(null);
     setIsQuickAddOpen(true);
-  }
-
-  async function handleSignIn() {
-    setAuthError(null);
-    setIsAuthPending(true);
-
-    try {
-      await signInWithGoogle();
-    } catch (error) {
-      setAuthError(getErrorMessage(error, 'Unable to start Google sign-in.'));
-      setIsAuthPending(false);
-    }
-  }
-
-  async function handleSignOut() {
-    setAuthError(null);
-    setIsAuthPending(true);
-
-    try {
-      await signOutFromSupabase();
-      clearAllAtelierLocalCache();
-      clearAuthenticatedUserContext();
-    } catch (error) {
-      setAuthError(getErrorMessage(error, 'Unable to sign out right now.'));
-      setIsAuthPending(false);
-    }
   }
 
   function handleStartEditingProfile(profileId: string) {
@@ -620,7 +398,7 @@ export default function App() {
         const nextProfile = await createStoredProfile(payload);
 
         updateProfilesFromServer((currentProfiles) =>
-          replaceProfileInCacheList(currentProfiles, nextProfile, {insert: 'prepend'}),
+          replaceProfileInList(currentProfiles, nextProfile, {insert: 'prepend'}),
         );
         setSelectedProfileId(nextProfile.id);
         setCurrentView('front');
@@ -630,7 +408,7 @@ export default function App() {
         const updatedProfile = await updateStoredProfile(editingProfileId, payload);
 
         updateProfilesFromServer((currentProfiles) =>
-          replaceProfileInCacheList(currentProfiles, updatedProfile),
+          replaceProfileInList(currentProfiles, updatedProfile),
         );
       }
 
@@ -667,7 +445,7 @@ export default function App() {
       await deleteStoredProfile(profileId);
 
       updateProfilesFromServer((currentProfiles) => {
-        const remainingProfiles = removeProfileFromCacheList(currentProfiles, profileId);
+        const remainingProfiles = removeProfileFromList(currentProfiles, profileId);
 
         setSelectedProfileId((currentSelectedProfileId) => {
           if (
@@ -821,7 +599,7 @@ export default function App() {
       );
 
       updateProfilesFromServer((currentProfiles) =>
-        replaceProfileInCacheList(currentProfiles, updatedProfile),
+        replaceProfileInList(currentProfiles, updatedProfile),
       );
       setIsEditingMeasurement(false);
     } catch (error) {
@@ -829,151 +607,6 @@ export default function App() {
     } finally {
       setIsSavingMeasurement(false);
     }
-  }
-
-  if (authStatus === 'config_error') {
-    return (
-      <AuthStateScreen
-        eyebrow="Configuration needed"
-        illustrationAlt="The Atelier mascot presenting a setup tip."
-        illustrationSrc={mascotGuideImage}
-        noteBody="Add the Supabase values once, and the private wardrobe workspace will be ready after restart."
-        noteTitle="Atelier note"
-        body="Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file before starting the app."
-        title="Supabase Auth is not configured"
-      />
-    );
-  }
-
-  if (authStatus === 'signed_out' || authStatus === 'loading') {
-    const isAuthLoadingScreen = authStatus === 'loading';
-    const isLoginActionDisabled = isAuthPending || isAuthLoadingScreen;
-    const shouldAnimateLoginCta = !isLoginActionDisabled && !prefersReducedMotion;
-
-    return (
-      <AuthStateScreen
-        action={
-          <div className="relative inline-flex">
-            {shouldAnimateLoginCta ? (
-              <>
-                <motion.span
-                  aria-hidden="true"
-                  animate={{
-                    opacity: [0, 0.5, 0],
-                    scale: [0.92, 1.1, 1.18],
-                  }}
-                  className="pointer-events-none absolute inset-[-0.38rem] rounded-full border border-secondary/45"
-                  transition={{
-                    duration: 2,
-                    ease: calmEase,
-                    repeat: Infinity,
-                    repeatDelay: 0.28,
-                  }}
-                />
-                <motion.span
-                  aria-hidden="true"
-                  animate={{
-                    opacity: [0.18, 0.34, 0.18],
-                  }}
-                  className="pointer-events-none absolute inset-[-0.28rem] rounded-full bg-[radial-gradient(circle_at_center,rgba(253,220,152,0.34),transparent_68%)] blur-[12px]"
-                  transition={{
-                    duration: 1.7,
-                    ease: calmEase,
-                    repeat: Infinity,
-                    repeatType: 'mirror',
-                  }}
-                />
-                <motion.span
-                  aria-hidden="true"
-                  animate={{
-                    opacity: [0, 0.3, 0],
-                    x: ['-135%', '135%', '135%'],
-                  }}
-                  className="pointer-events-none absolute inset-y-[0.1rem] left-0 w-12 rounded-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.38),transparent)] blur-[1px]"
-                  transition={{
-                    duration: 2.6,
-                    ease: calmEase,
-                    repeat: Infinity,
-                    repeatDelay: 1.1,
-                  }}
-                />
-              </>
-            ) : null}
-            <motion.button
-              animate={{
-                boxShadow:
-                  shouldAnimateLoginCta
-                    ? '0 18px 34px -18px rgba(3,25,46,0.84)'
-                    : '0 18px 32px -22px rgba(3,25,46,0.8)',
-              }}
-              className="type-button relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full bg-[linear-gradient(135deg,_var(--color-primary),_var(--color-primary-container))] px-5 py-3 text-white shadow-[0_18px_32px_-22px_rgba(3,25,46,0.8)] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isLoginActionDisabled}
-              onClick={() => void handleSignIn()}
-              transition={{duration: 0.3, ease: calmEase}}
-              type="button"
-            >
-              <motion.span
-                animate={
-                  shouldAnimateLoginCta
-                    ? {
-                        rotate: [0, 0, 10, 0],
-                        scale: [1, 1, 1.08, 1],
-                        y: [0, 0, -1, 0],
-                      }
-                    : {rotate: 0, scale: 1, y: 0}
-                }
-                className="inline-flex h-5 w-5 items-center justify-center"
-                transition={
-                  shouldAnimateLoginCta
-                    ? {
-                        duration: 2.4,
-                        ease: calmEase,
-                        repeat: Infinity,
-                        repeatDelay: 0.9,
-                      }
-                    : {duration: 0.2}
-                }
-              >
-                {isLoginActionDisabled ? (
-                  <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
-                ) : (
-                  <svg
-                    aria-hidden="true"
-                    className="h-4 w-4"
-                    viewBox="0 0 18 18"
-                  >
-                    <path
-                      d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.56 2.68-3.86 2.68-6.62Z"
-                      fill="#4285F4"
-                    />
-                    <path
-                      d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.85.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z"
-                      fill="#34A853"
-                    />
-                    <path
-                      d="M3.97 10.72A5.41 5.41 0 0 1 3.69 9c0-.6.1-1.18.28-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33Z"
-                      fill="#FBBC05"
-                    />
-                    <path
-                      d="M9 3.58c1.32 0 2.5.45 3.43 1.33l2.58-2.58C13.46.89 11.42 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z"
-                      fill="#EA4335"
-                    />
-                  </svg>
-                )}
-              </motion.span>
-              <span>{isAuthPending ? 'Redirecting to Google…' : 'Continue with Google'}</span>
-            </motion.button>
-          </div>
-        }
-        actionPlacement="illustration"
-        body="Sign in with Google to access a calm, private fitting room for your household measurements."
-        eyebrow="Household wardrobe reference"
-        error={authError}
-        illustrationAlt="The Atelier mascot welcoming the user into a refined fitting room."
-        illustrationSrc={mascotLoginSceneImage}
-        title="Sign in to The Atelier"
-      />
-    );
   }
 
   return (
@@ -989,23 +622,6 @@ export default function App() {
             <h1 className="type-title hidden text-primary sm:block">The Atelier</h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="group relative">
-              <button
-                aria-label={isAuthPending ? 'Signing out' : 'Sign out'}
-                className="type-button inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-outline-variant/16 bg-surface px-3 py-2.5 text-primary shadow-[0_16px_30px_-24px_rgba(3,25,46,0.45)] transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
-                disabled={isAuthPending}
-                onClick={() => void handleSignOut()}
-                type="button"
-              >
-                <LogOut size={16} />
-                <span className="hidden md:inline">
-                  {isAuthPending ? 'Signing out…' : 'Sign out'}
-                </span>
-              </button>
-              <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 min-w-max -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-white opacity-0 shadow-[0_14px_24px_-18px_rgba(3,25,46,0.9)] transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-                Sign out
-              </div>
-            </div>
             <ProfileSwitcher
               deletingProfileId={deletingProfileId}
               onDeleteProfile={handleDeleteProfile}
@@ -1106,8 +722,6 @@ export default function App() {
 
       <main className="relative mx-auto max-w-[96rem] px-4 pb-6 pt-3 xl:px-8 xl:py-8">
         <section className="min-h-[42rem] rounded-[2.4rem] bg-surface/92 p-5 shadow-[0_12px_32px_-4px_rgba(26,28,25,0.06)] ring-1 ring-outline-variant/12 xl:p-7">
-          {shouldShowRevalidationNotice ? <RevalidatingProfilesNotice /> : null}
-
           {shouldShowWorkspaceSkeleton ? (
             <SubtleWorkspaceSkeleton />
           ) : apiStatus === 'offline' ? (
@@ -1123,14 +737,14 @@ export default function App() {
               }
               body={
                 serviceError ??
-                'Supabase is unavailable right now. Check your connection, then retry.'
+                'The local data service is unavailable. Start it with pnpm dev, then retry.'
               }
-              eyebrow="Connection needed"
+              eyebrow="Local service needed"
               illustrationAlt="The Atelier mascot presenting a gentle connection reminder."
               illustrationSrc={mascotGuideImage}
-              noteBody="If you are working locally, confirm your Supabase keys are configured and then retry this page."
+              noteBody="If you are working locally, confirm the local data service is running, then retry this page."
               noteTitle="Atelier note"
-              title="Supabase offline"
+              title="Local data service offline"
             />
           ) : selectedProfile ? (
             <AnimatePresence initial={false} mode="wait">
@@ -1298,26 +912,6 @@ export default function App() {
 }
 
 
-function RevalidatingProfilesNotice() {
-  return (
-    <div
-      aria-live="polite"
-      className="mb-5 flex flex-col gap-3 rounded-[1.6rem] bg-secondary-container/28 px-4 py-3 text-secondary ring-1 ring-secondary/18 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div>
-        <p className="type-overline">Confirming with Supabase</p>
-        <p className="type-note mt-1 text-secondary/82">
-          Showing same-session cached profiles while Supabase confirms the current measurements.
-        </p>
-      </div>
-      <div className="type-button inline-flex items-center gap-2 rounded-full bg-white/60 px-3 py-2">
-        <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
-        Revalidating
-      </div>
-    </div>
-  );
-}
-
 function SubtleWorkspaceSkeleton() {
   const prefersReducedMotion = useReducedMotion();
 
@@ -1405,108 +999,6 @@ function SubtleWorkspaceSkeleton() {
 
           <div className="mt-4 h-14 w-full rounded-full bg-surface-container-high/72" />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function AuthStateScreen({
-  action,
-  actionPlacement = 'content',
-  body,
-  eyebrow,
-  error,
-  illustrationAlt,
-  illustrationSrc,
-  noteBody,
-  noteTitle,
-  title,
-}: {
-  action?: ReactNode;
-  actionPlacement?: 'content' | 'illustration';
-  body: string;
-  eyebrow?: string;
-  error?: string | null;
-  illustrationAlt?: string;
-  illustrationSrc?: string;
-  noteBody?: string;
-  noteTitle?: string;
-  title: string;
-}) {
-  return (
-    <div className="min-h-screen bg-background px-4 py-10 text-on-surface md:px-8">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(253,220,152,0.18),_transparent_38%),linear-gradient(180deg,_rgba(255,255,255,0.55),_transparent_45%)]" />
-      <div className="relative mx-auto flex min-h-[80vh] max-w-6xl items-center justify-center">
-        <section className="w-full overflow-hidden rounded-[2.4rem] bg-surface/92 shadow-[0_12px_32px_-4px_rgba(26,28,25,0.06)] ring-1 ring-outline-variant/12">
-          <div className="grid gap-0 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-            <div className="flex flex-col justify-center p-8 md:p-10 lg:p-12">
-              <div className="mb-8">
-                <p className="type-overline hidden text-secondary sm:block">
-                  {eyebrow ?? 'Protected workspace'}
-                </p>
-                <h1 className="type-title mt-3 text-primary">{title}</h1>
-                <p className="type-body mt-5 hidden text-on-surface-variant sm:block">{body}</p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[1.6rem] bg-surface-container-low/92 p-4 ring-1 ring-outline-variant/10">
-                  <p className="type-label text-on-surface-variant">Profiles</p>
-                  <p className="type-note mt-2 text-primary">One for each family member.</p>
-                </div>
-                <div className="rounded-[1.6rem] bg-surface-container-low/92 p-4 ring-1 ring-outline-variant/10">
-                  <p className="type-label text-on-surface-variant">Views</p>
-                  <p className="type-note mt-2 text-primary">Front and back, kept in step.</p>
-                </div>
-                <div className="hidden rounded-[1.6rem] bg-surface-container-low/92 p-4 ring-1 ring-outline-variant/10 sm:block">
-                  <p className="type-label text-on-surface-variant">Units</p>
-                  <p className="type-note mt-2 text-primary">Switch cm or in whenever needed.</p>
-                </div>
-              </div>
-
-              {action && actionPlacement === 'content' ? <div className="mt-8">{action}</div> : null}
-              {error ? (
-                <div className="type-note mt-6 rounded-[1.5rem] bg-secondary-container/28 px-4 py-3 text-secondary">
-                  {error}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="relative overflow-hidden bg-[linear-gradient(180deg,rgba(244,244,239,0.84),rgba(250,250,245,0.98))] p-6 md:p-8 lg:p-10">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(253,220,152,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(3,25,46,0.08),transparent_30%)]" />
-              <div className="pointer-events-none absolute right-[10%] top-[12%] h-24 w-24 rounded-full bg-secondary-container/18 blur-3xl" />
-              <div className="pointer-events-none absolute bottom-[20%] left-[8%] h-28 w-28 rounded-full bg-primary/6 blur-3xl" />
-              <div className="relative flex h-full flex-col justify-between gap-6">
-                <div className="relative flex min-h-[18rem] items-center justify-center px-2 pt-2 md:min-h-[22rem] md:px-4 lg:min-h-[24rem]">
-                  <div className="pointer-events-none absolute bottom-[8%] left-1/2 h-10 w-[60%] -translate-x-1/2 rounded-full bg-[rgba(3,25,46,0.08)] blur-2xl" />
-                  {illustrationSrc ? (
-                    <img
-                      alt={illustrationAlt ?? ''}
-                      className="relative mx-auto w-full max-w-[31rem] drop-shadow-[0_24px_42px_rgba(3,25,46,0.16)]"
-                      src={illustrationSrc}
-                    />
-                  ) : (
-                    <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-primary/8 text-primary">
-                      <ShieldCheck size={28} />
-                    </div>
-                  )}
-                </div>
-
-                {action && actionPlacement === 'illustration' ? (
-                  <div className="flex justify-center lg:-mt-6">
-                    {action}
-                  </div>
-                ) : null}
-
-                {noteBody ? (
-                  <div className="max-w-md rounded-[1.8rem] bg-primary px-5 py-5 text-white shadow-[0_22px_44px_-30px_rgba(3,25,46,0.75)] lg:-mt-8">
-                    <p className="type-overline text-white/64">{noteTitle ?? 'Atelier note'}</p>
-                    <p className="type-note mt-3 text-white/82">{noteBody}</p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   );

@@ -61,21 +61,21 @@ Response:
 
 ### Repository layer
 
-Add two Postgres-backed read functions to `server/database.ts`:
+Add two SQLite-backed read functions to `server/database.ts`:
 
 - `getProfileHeightHistory(profileId)`
 - `getMeasurementHistory(profileId, measurementKey)`
 
 These query:
 
-- `public.profile_height_history`
-- `public.measurement_history`
+- `profile_height_history`
+- `measurement_history`
 
-and map Postgres rows into JSON-safe API objects.
+and map SQLite rows into JSON-safe API objects.
 
 ### Route layer
 
-Add two Express route handlers to `server/index.ts`.
+Add two local Node API route handlers to `server/index.ts`.
 
 They should:
 

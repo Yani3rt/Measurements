@@ -3,7 +3,7 @@ import {describe, it} from 'node:test';
 import {isValidProfileId, validateMeasurementValue, validateProfileInput} from '../src/validation';
 
 describe('server validation', () => {
-  it('accepts standard Supabase UUID profile identifiers', () => {
+  it('accepts standard UUID profile identifiers', () => {
     assert.equal(isValidProfileId('019db65d-c1bb-79c2-a25b-55cb27235d64'), true);
   });
 
