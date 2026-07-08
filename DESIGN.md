@@ -13,6 +13,11 @@ The palette is rooted in a "Boutique Neutral" philosophy. We use soft creams and
 ### The Palette
 *   **Primary (Deep Navy):** `#03192e` — Used for high-authority elements and primary CTAs.
 *   **Secondary (Muted Gold):** `#735b24` — Reserved for "Tailor's Notes," success states, or premium highlights.
+*   **Measurement Thread Accents:** Category color is used as a navigation aid, not decoration:
+    *   Head & neck: Copper `#8a4f2d`
+    *   Torso: Tailor blue `#2f5f74`
+    *   Waist & hip: Muted gold `#735b24`
+    *   Leg: Olive `#4f6f4a`
 *   **Background:** `#fafaf5` — A warm, "parchment" cream that feels more premium than pure white.
 *   **Surface Tiers:** 
     *   `surface_container_lowest`: `#ffffff` (Pure white for floating cards)
@@ -22,6 +27,7 @@ The palette is rooted in a "Boutique Neutral" philosophy. We use soft creams and
 ### Creative Direction
 *   **The "No-Line" Rule:** We do not use 1px solid borders to section content. Boundaries must be defined through background color shifts. A measurement input group should sit on `surface_container_low` against the `surface` background.
 *   **Surface Hierarchy:** Treat the UI as layers of fine paper. Nesting `surface_container_lowest` cards inside a `surface_container` section creates a natural lift that conveys importance without visual clutter.
+*   **Thread Color Rule:** Measurement category color may appear on group headers, saved dots, selected-measurement tips, and a single card accent strip. It should never replace the navy primary action system or turn the ledger into a rainbow grid.
 *   **The Glass & Gradient Rule:** For "Floating Action Buttons" or navigation bars, use **Glassmorphism**. Apply `surface` at 80% opacity with a `20px` backdrop blur. For main CTAs, use a subtle linear gradient from `primary` (`#03192e`) to `primary_container` (`#1a2e44`) at a 135-degree angle to add "soul" and depth.
 
 ---

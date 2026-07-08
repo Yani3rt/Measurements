@@ -1,4 +1,4 @@
-import type {ReactNode} from 'react';
+import type {CSSProperties, ReactNode} from 'react';
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {AnimatePresence, motion, useReducedMotion} from 'motion/react';
 import {
@@ -65,6 +65,9 @@ type MeasurementGroup = {
   title: string;
   caption: string;
   keys: MeasurementKey[];
+  accent: string;
+  soft: string;
+  ink: string;
 };
 
 const elegantEase = [0.22, 1, 0.36, 1] as const;
@@ -76,23 +79,51 @@ const measurementGroups: MeasurementGroup[] = [
     title: 'Head & neck',
     caption: 'Small measures that anchor every fit.',
     keys: ['hatSize', 'neck'],
+    accent: 'var(--color-thread-head)',
+    soft: 'var(--color-thread-head-soft)',
+    ink: 'var(--color-thread-head-ink)',
   },
   {
     title: 'Torso',
     caption: 'The core reference for tops, dresses, and jackets.',
     keys: ['shoulderCircumference', 'bust', 'underBust', 'shoulder', 'back', 'torso', 'sleeveLength'],
+    accent: 'var(--color-thread-torso)',
+    soft: 'var(--color-thread-torso-soft)',
+    ink: 'var(--color-thread-torso-ink)',
   },
   {
     title: 'Waist & hip',
     caption: 'The balance line for trousers, skirts, and tailoring ease.',
     keys: ['waist', 'hips', 'rise'],
+    accent: 'var(--color-thread-waist)',
+    soft: 'var(--color-thread-waist-soft)',
+    ink: 'var(--color-thread-waist-ink)',
   },
   {
     title: 'Leg',
     caption: 'Length and contour records for lower garments.',
     keys: ['thigh', 'knee', 'outseam', 'inseam'],
+    accent: 'var(--color-thread-leg)',
+    soft: 'var(--color-thread-leg-soft)',
+    ink: 'var(--color-thread-leg-ink)',
   },
 ];
+
+const measurementGroupByKey = new Map(
+  measurementGroups.flatMap((group) => group.keys.map((key) => [key, group] as const)),
+);
+
+function getMeasurementGroup(key: MeasurementKey | null) {
+  return key ? (measurementGroupByKey.get(key) ?? null) : null;
+}
+
+function getGroupStyle(group: Pick<MeasurementGroup, 'accent' | 'soft' | 'ink'>): CSSProperties {
+  return {
+    '--measurement-group-accent': group.accent,
+    '--measurement-group-soft': group.soft,
+    '--measurement-group-ink': group.ink,
+  } as CSSProperties;
+}
 
 const fadeUpVariants = {
   hidden: {opacity: 0, y: 14},
@@ -1358,6 +1389,8 @@ function ProfileWorkspace({
   const selectedMeasurementValueCm = currentMeasurement
     ? profile.measurements[currentMeasurement.key]
     : null;
+  const selectedGroup = getMeasurementGroup(currentMeasurement?.key ?? null);
+  const selectedGuidanceStyle = selectedGroup ? getGroupStyle(selectedGroup) : undefined;
   const prefersReducedMotion = useReducedMotion();
   const previousHasCurrentMeasurementRef = useRef(Boolean(currentMeasurement));
   const shouldAnimateGuidanceToggle =
@@ -1420,15 +1453,16 @@ function ProfileWorkspace({
             <motion.div
               animate={{
                 boxShadow: currentMeasurement
-                  ? '0 18px 36px -26px rgba(139,107,40,0.3)'
-                  : '0 0 0 0 rgba(139,107,40,0)',
+                  ? '0 18px 36px -26px color-mix(in srgb, var(--measurement-group-accent) 36%, transparent)'
+                  : '0 0 0 0 rgba(3,25,46,0)',
               }}
               className={`rounded-[1.9rem] p-5 transition-all ${
                 currentMeasurement
-                  ? 'bg-secondary-container/38 text-secondary ring-1 ring-secondary/24 shadow-[0_18px_36px_-26px_rgba(139,107,40,0.3)]'
+                  ? 'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--measurement-group-soft)_72%,white),rgba(255,255,255,0.68))] text-[var(--measurement-group-ink)] ring-1 ring-[color-mix(in_srgb,var(--measurement-group-accent)_24%,transparent)] shadow-[0_18px_36px_-26px_color-mix(in_srgb,var(--measurement-group-accent)_36%,transparent)]'
                   : 'bg-white/74 text-primary ring-1 ring-outline-variant/12'
               }`}
               layout={shouldAnimateGuidanceToggle}
+              style={selectedGuidanceStyle}
               transition={
                 prefersReducedMotion
                   ? {duration: 0.01}
@@ -1455,7 +1489,7 @@ function ProfileWorkspace({
                     }
                   >
                     <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-center lg:justify-between xl:flex-col xl:items-start">
-                      <p className="type-note text-secondary">
+                      <p className="type-note text-[var(--measurement-group-ink)]">
                         Tip: {currentMeasurement.guide}
                       </p>
                     </div>
@@ -1623,17 +1657,19 @@ function MeasurementFolio({
     >
       {groups.map((group, groupIndex) => (
         <motion.section
-          className="rounded-[1.65rem] bg-white/48 p-3 ring-1 ring-outline-variant/8"
+          className="rounded-[1.65rem] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--measurement-group-soft)_34%,white),rgba(255,255,255,0.52))] p-3 ring-1 ring-[color-mix(in_srgb,var(--measurement-group-accent)_14%,transparent)]"
           custom={groupIndex}
           key={group.title}
+          style={getGroupStyle(group)}
           variants={fadeUpVariants}
         >
           <div className="mb-3 flex flex-wrap items-end justify-between gap-2 px-1">
             <div>
-              <p className="type-overline text-secondary">{group.title}</p>
+              <div className="mb-2 h-1 w-11 rounded-full bg-[var(--measurement-group-accent)]" />
+              <p className="type-overline text-[var(--measurement-group-ink)]">{group.title}</p>
               <p className="type-note mt-1 text-on-surface-variant">{group.caption}</p>
             </div>
-            <div className="type-button rounded-full bg-secondary-container/34 px-3 py-1 text-secondary">
+            <div className="type-button rounded-full bg-[var(--measurement-group-soft)] px-3 py-1 text-[var(--measurement-group-ink)]">
               {group.definitions.filter((definition) => profile.measurements[definition.key] > 0).length}
               {' '}saved
             </div>
@@ -1674,8 +1710,8 @@ function MeasurementFolio({
                   }
                   className={`scroll-mt-5 overflow-hidden rounded-[1.45rem] text-left transition-all ${
                     isActive
-                      ? 'z-10 bg-primary text-white shadow-[0_18px_36px_-24px_rgba(36,88,92,0.42)] ring-1 ring-guidance/40'
-                      : 'bg-[linear-gradient(180deg,rgba(255,255,255,0.86),rgba(250,250,245,0.72))] text-primary ring-1 ring-outline-variant/10 hover:bg-white'
+                      ? 'z-10 bg-primary text-white shadow-[0_18px_36px_-24px_rgba(36,88,92,0.42)] ring-1 ring-[var(--measurement-group-accent)]'
+                      : 'bg-[linear-gradient(180deg,rgba(255,255,255,0.88),color-mix(in_srgb,var(--measurement-group-soft)_22%,rgba(250,250,245,0.76)))] text-primary ring-1 ring-[color-mix(in_srgb,var(--measurement-group-accent)_12%,transparent)] hover:bg-white'
                   }`}
                   initial={prefersReducedMotion ? false : {opacity: 0, y: 14}}
                   key={definition.key}
@@ -1697,7 +1733,10 @@ function MeasurementFolio({
                     },
                     layout: {duration: 0.18, ease: decisiveEase},
                   }}
-                >
+                  >
+                  <div
+                    className={`h-1 w-full ${isActive ? 'bg-[var(--measurement-group-accent)]' : 'bg-[color-mix(in_srgb,var(--measurement-group-accent)_42%,transparent)]'}`}
+                  />
                   <button
                     className="w-full px-4 py-4 text-left"
                     onClick={handleCardClick}
@@ -1708,10 +1747,10 @@ function MeasurementFolio({
                         <span
                           className={`block h-2.5 w-2.5 shrink-0 rounded-full ${
                             isActive
-                              ? 'bg-guidance-soft'
+                              ? 'bg-[var(--measurement-group-soft)]'
                               : isMeasured
-                                ? 'bg-secondary'
-                                : 'bg-primary/25'
+                                ? 'bg-[var(--measurement-group-accent)]'
+                                : 'bg-[color-mix(in_srgb,var(--measurement-group-accent)_22%,white)]'
                           }`}
                         />
                         <p className="type-ui min-w-0 text-balance leading-snug">

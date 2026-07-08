@@ -12,6 +12,18 @@
   --color-guidance: #2e6f73;
   --color-guidance-strong: #24585c;
   --color-guidance-soft: #d7e8e6;
+  --color-thread-head: #8a4f2d;
+  --color-thread-head-soft: #f3ded1;
+  --color-thread-head-ink: #5b311f;
+  --color-thread-torso: #2f5f74;
+  --color-thread-torso-soft: #d9e8ee;
+  --color-thread-torso-ink: #1f4858;
+  --color-thread-waist: #735b24;
+  --color-thread-waist-soft: #f6e4b6;
+  --color-thread-waist-ink: #5a4419;
+  --color-thread-leg: #4f6f4a;
+  --color-thread-leg-soft: #dcebd8;
+  --color-thread-leg-ink: #355331;
   --color-background: #fafaf5;
   --color-surface: #fafaf5;
   --color-surface-container-low: #f4f4ef;
