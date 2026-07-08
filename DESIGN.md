@@ -70,6 +70,7 @@ Inputs must feel surgical and clean.
 
 ### Progress & Detail Cards
 *   Forbid the use of divider lines. Separate "Arm Length" from "Shoulder Width" using `24px` of vertical white space or by placing them in alternating `surface_container_low` and `surface_container_lowest` blocks.
+*   The active measurement should be the page's strongest product moment: show its label, value, guidance, and direct actions together before the ledger. This is the allowed "bold" emphasis because it clarifies the current task rather than adding ornament.
 
 ---
 

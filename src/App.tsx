@@ -197,7 +197,7 @@ export default function App() {
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<MeasurementView>('front');
-  const [unit, setUnit] = useState<Unit>('cm');
+  const [unit, setUnit] = useState<Unit>('in');
   const [selectedMeasurement, setSelectedMeasurement] = useState<MeasurementKey | null>(null);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [draftProfile, setDraftProfile] = useState<DraftProfile>(defaultDraftProfile);
@@ -1389,6 +1389,10 @@ function ProfileWorkspace({
   const selectedMeasurementValueCm = currentMeasurement
     ? profile.measurements[currentMeasurement.key]
     : null;
+  const selectedMeasurementDisplay =
+    selectedMeasurementValueCm && selectedMeasurementValueCm > 0
+      ? formatMeasurement(selectedMeasurementValueCm, unit)
+      : 'Not saved';
   const selectedGroup = getMeasurementGroup(currentMeasurement?.key ?? null);
   const selectedGuidanceStyle = selectedGroup ? getGroupStyle(selectedGroup) : undefined;
   const prefersReducedMotion = useReducedMotion();
@@ -1488,10 +1492,44 @@ function ProfileWorkspace({
                         : {duration: 0.3, ease: calmEase}
                     }
                   >
-                    <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-center lg:justify-between xl:flex-col xl:items-start">
-                      <p className="type-note text-[var(--measurement-group-ink)]">
-                        Tip: {currentMeasurement.guide}
-                      </p>
+                    <div className="grid w-full gap-4 md:grid-cols-[minmax(10rem,0.72fr)_minmax(0,1fr)] md:items-center xl:grid-cols-1 2xl:grid-cols-[minmax(10rem,0.72fr)_minmax(0,1fr)]">
+                      <div className="min-w-0">
+                        <div className="mb-3 h-1 w-12 rounded-full bg-[var(--measurement-group-accent)]" />
+                        <p className="type-label text-[var(--measurement-group-ink)] opacity-75">
+                          Active measure
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <h3 className="font-headline text-[2.35rem] font-semibold leading-[0.9] tracking-[-0.04em] text-primary md:text-[2.75rem]">
+                            {currentMeasurement.label}
+                          </h3>
+                          <p className="font-headline text-[2.15rem] font-semibold leading-none tracking-[-0.04em] text-[var(--measurement-group-ink)] md:text-[2.45rem]">
+                            {selectedMeasurementDisplay}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="min-w-0 space-y-4">
+                        <p className="type-note text-[var(--measurement-group-ink)]">
+                          {currentMeasurement.guide}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            className="type-button inline-flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-white transition hover:bg-primary-container active:scale-[0.98]"
+                            onClick={() => onStartEditing(currentMeasurement.key)}
+                            type="button"
+                          >
+                            <PencilLine size={15} />
+                            Edit
+                          </button>
+                          <button
+                            className="type-button inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-3 text-[var(--measurement-group-ink)] ring-1 ring-[color-mix(in_srgb,var(--measurement-group-accent)_18%,transparent)] transition hover:bg-white active:scale-[0.98]"
+                            onClick={onOpenHistory}
+                            type="button"
+                          >
+                            <History size={15} />
+                            History
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 ) : (
@@ -1780,10 +1818,10 @@ function MeasurementFolio({
                         onClick={() => onSelectMeasurement(definition.key)}
                         transition={{duration: 0.24, ease: calmEase}}
                       >
-                        <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="mt-3 grid gap-2">
                           <button
                             aria-label={`Edit ${definition.label}`}
-                            className="inline-flex h-10 items-center justify-center rounded-full bg-white/12 text-white transition hover:bg-white/18"
+                            className="type-button inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-white/12 px-3 text-white transition hover:bg-white/18"
                             onClick={(event) => {
                               event.stopPropagation();
                               onStartEditing(definition.key);
@@ -1791,10 +1829,11 @@ function MeasurementFolio({
                             type="button"
                           >
                             <PencilLine size={15} />
+                            Edit
                           </button>
                           <button
                             aria-label={`View ${definition.label} history`}
-                            className="inline-flex h-10 items-center justify-center rounded-full bg-white/12 text-white transition hover:bg-white/18"
+                            className="type-button inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-white/12 px-3 text-white transition hover:bg-white/18"
                             onClick={(event) => {
                               event.stopPropagation();
                               onSelectMeasurement(definition.key);
@@ -1803,6 +1842,7 @@ function MeasurementFolio({
                             type="button"
                           >
                             <History size={15} />
+                            History
                           </button>
                         </div>
                       </motion.div>
